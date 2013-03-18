@@ -12,7 +12,8 @@
 extern "C" {
 #endif
     
-#include "../mybot-xmpp.h"
+#include <time.h>
+    
     typedef enum {
         TSTRING,
         TUSER,
@@ -87,6 +88,7 @@ extern "C" {
 
     typedef unsigned char bool;
 #define MAX_BUFSIZE     8192    // 8KiB
+#define MAX_JID          512    // 256 * 2 (for unicode)
 #define true               1
 #define false              0
 

@@ -1,5 +1,5 @@
 #include "datatypes.h"
-#include "../mybot-xmpp.h"
+#include "mybot-xmpp.h"
 
 LIST_t *mlist_init(int count, char *name, DATATYPE dtType) {
     int n;
