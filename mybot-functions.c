@@ -1,5 +1,5 @@
 #include "mybot-xmpp.h"
-#include "modules/datatypes.h"
+#include "datatypes.h"
 
 // not-grouped functions, well collapse here {{
 inline int _rand();
@@ -10,9 +10,15 @@ void _message(MSGTYPE msgtype, char *msg, ...) {
     va_start(va, msg);
     char mmsg[MAX_BUFSIZE]={0};
     
+#ifndef __unix__
+    /* windows command line does not support unicode characters,
+     * so it should be filtered for windows */
+    
+#endif
+    
     switch(msgtype & (~MSG_SUB)) {
         case MSG_DEBUG:
-            if(debug)
+            if(global.system.debug)
                 sprintf(mmsg, _TCBLACK _BOLD "DD" _RESET" " _TCBLACK " %s" _RESET, msg);
             break;
         case MSG_ERROR:
@@ -48,10 +54,17 @@ void _message(MSGTYPE msgtype, char *msg, ...) {
 
 inline int _rand()
 {
-    FILE *fr = fopen("/dev/urandom", "rb");
     int r=0;
-    r = fgetc(fr);
+    
+#ifdef __unix__
+    FILE *fr = fopen("/dev/urandom", "rb");
+    fread(&r, sizeof(int), 1, fr);
     fclose(fr);
+#else
+    srand(time(NULL));
+    r = rand();
+#endif
+    
     return r;
 }
 
@@ -62,6 +75,48 @@ inline char *rpckup(char *a, char *b) // random pickup
         case 1: return b; break;
     }
 }
+
+/* load's config file */
+bool load_config(char *file)
+{
+    /* CONFIG file format:
+     * valuename = value
+     * 
+     * currently only bot admins is configurable
+     */
+    
+    
+    
+    return true;
+}
+
+/* getting pure JID */
+inline char *pure_jid(char *jid) {
+    char buf[MAX_JID];
+    
+    strcpy(buf, jid);
+    buf[strlen(jid) - strlen(strchr(jid, '@'))] = 0;
+    
+    return strmalloc(buf);
+}
+
+bool isbotadmin(char *jid)
+{
+    // the format of global.system.botadmins is: <pjid>;<pjid>;<pjid>;...
+    char pjid[MAX_JID];
+    uint p=0, q=0;
+    
+    while(global.system.botadmins[p] != 0) {
+        while(global.system.botadmins[p] != ';' || global.system.botadmins[p] != 0)
+            pjid[q++] = global.system.botadmins[p++];
+        
+        pjid[q] = 0; q=0;
+        if(!strcmp(jid, pjid)) return true;
+    }
+    
+    return false;
+}
+
 /* ****************************************
  * try to find flooders, it's easy and not!
  * because of some flooders, some !

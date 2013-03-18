@@ -1,6 +1,6 @@
-#include "mybot-xmpp.h"
 #include "strophe.h"
-#include "modules/datatypes.h"
+#include "datatypes.h"
+#include "mybot-xmpp.h"
 #include "modules/responser.h"
 
 /*
@@ -14,28 +14,7 @@ typedef struct {
     char *msg;
     xmpp_conn_t *conn;
     xmpp_ctx_t *ctx;
-} thread_in;
-
-struct {
-    struct { //  configuration variables
-        char *room; // room name
-        char *jid, *pjid; // jid, pure jid
-        char *responsefile; // answers, input file
-        char *unknownfile; // question that not understood
-        bool securitypass; // answer to security
-        bool attackflooders; // attack flooders
-        bool welcome; // say welcome to new comers
-        bool acceptfriendship; // accept friendship or not
-    } config;
-
-    struct { // status variables
-        AFFILIATION affilation; // our affiliation in room
-        bool wait; // wait state
-        bool connected; // connected to server
-        bool room_joined; // joined in room
-        bool banned; // banned from room
-    } status;
-} global;
+} msg_t;
 
 #define IMMODERATOR           (global.status.affilation == AFF_OWNER || global.status.affilation == AFF_ADMIN)  // check if I'm moderator in room
 #define ISMODERATOR(user)     ((user)->aAffiliation == AFF_OWNER || (user)->aAffiliation == AFF_ADMIN)          // check if He/She is moderator in room
@@ -55,7 +34,7 @@ void mybot_init(xmpp_conn_t *conn, xmpp_ctx_t *ctx) {
     fprintf(stderr, _ERASESCREEN _CURSER_ABS("0","0"));
     {
         pthread_t tt;
-	thread_in *a = malloc(sizeof(thread_in));
+	msg_t *a = malloc(sizeof(msg_t));
 	a->conn = conn; a->ctx = ctx; a->msg = " "; a->to = global.config.room;
 	pthread_create(&tt, NULL, loop_thread, (void*)a);
     }
@@ -68,7 +47,7 @@ void mybot_init(xmpp_conn_t *conn, xmpp_ctx_t *ctx) {
     lUsers = mlist_init(30, "lUsers", TUSER); // users list
 }
 
-void xmpp_room_command(thread_in v, char *command) {
+void xmpp_room_command(msg_t v, char *command) {
     _message(MSG_DEBUG, "main.xmpp_room_command(...);");
     if(!strcmp(command, "kick")) {
         xmpp_stanza_t *kick = xmpp_stanza_new(v.ctx);
@@ -149,7 +128,7 @@ void xmpp_room_command(thread_in v, char *command) {
  * 1. private response
  * 2. public response
  */
-void exec_cmd(char *msg, char *from, char *out, thread_in v) {
+void exec_cmd(char *msg, char *from, char *out, msg_t v) {
     _message(MSG_DEBUG, "main.exec_cmd(%s, %s, ...);", msg, from);
     
     if (!strncmp(msg, "gettime", 7) || !strncmp(msg, "time", 4)) {
@@ -179,27 +158,28 @@ void exec_cmd(char *msg, char *from, char *out, thread_in v) {
         //sprintf(out, "*** %s", ((USER_t*)mlist_get(lUsers, NULL, sel))->sUsername);
     } else if (!strncasecmp(msg, "say", 3)) strcpy(out, (char*) (msg + 3));
     
-    else if (!strcmp(from, "pero_p") || !strcmp(from, "lorenzo_adin")) {
+    //else if (!strcmp(from, "pero_p") || !strcmp(from, "lorenzo_adin")) {
+    else if (isbotadmin(from)) {
 
         if (IMMODERATOR) {
             if (!strncmp(msg, "kick", 4)) {
-                thread_in p; p = v; p.to = (char*) (msg + 5); p.msg = NULL;
+                msg_t p; p = v; p.to = (char*) (msg + 5); p.msg = NULL;
                 xmpp_room_command(p, "kick");
 
             } else if (!strncmp(msg, "ban", 3)) {
-                thread_in p; p = v; p.to = (char*) (msg + 4); p.msg = NULL;
+                msg_t p; p = v; p.to = (char*) (msg + 4); p.msg = NULL;
                 xmpp_room_command(p, "affiliation:outcast");
 
             } else if (!strncmp(msg, "unban", 5)) {
-                thread_in p; p = v; p.to = (char*) (msg + 4); p.msg = NULL;
+                msg_t p; p = v; p.to = (char*) (msg + 4); p.msg = NULL;
                 xmpp_room_command(p, "affiliation:none");
 
             } else if (!strncmp(msg, "admin", 5)) {
-                thread_in p; p = v; p.to = (char*) (msg + 6); p.msg = NULL;
+                msg_t p; p = v; p.to = (char*) (msg + 6); p.msg = NULL;
                 xmpp_room_command(p, "affiliation:admin");
 
             } else if (!strncmp(msg, "member", 6)) {
-                thread_in p; p = v; p.to = (char*) (msg + 7); p.msg = NULL;
+                msg_t p; p = v; p.to = (char*) (msg + 7); p.msg = NULL;
                 xmpp_room_command(p, "affiliation:member");
 
             }
@@ -270,7 +250,7 @@ void send_message(char *to, char *msg, char *type, xmpp_conn_t *conn, xmpp_ctx_t
 
 void *loop_thread(void *ptr) {
     _message(MSG_DEBUG, "main.thread_send(...);");
-    thread_in *a = (thread_in*)ptr;
+    msg_t *a = (msg_t*)ptr;
     int delay, pl=0;
     
     while (1) {
@@ -282,7 +262,7 @@ void *loop_thread(void *ptr) {
                         if (pl == lFlood->iCount) {
                             if (IMMODERATOR) { // if we can, so we BAN them
                                 _message(MSG_INFOR, "THREAD: trying to BAN flooders....(%d in list)", lFlood->iCount);
-                                thread_in p; p.to = lFlood; p.msg = NULL; p.conn = a->conn; p.ctx = a->ctx;
+                                msg_t p; p.to = lFlood; p.msg = NULL; p.conn = a->conn; p.ctx = a->ctx;
                                 list_print(lFlood);
                                 xmpp_room_command(p, "list:affiliation:outcast");
                                 mlist_free(lFlood);
@@ -529,7 +509,7 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
             }
 
             if (intext[0] == ':') { // if it's command
-                thread_in t;
+                msg_t t;
                 t.conn = conn;
                 t.ctx = ctx;
                 exec_cmd((char*) (intext + 1), id, replytext, t);
@@ -591,7 +571,7 @@ int chat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza,
     }
     
     if (intext[0] == ':') { // command
-        thread_in t; t.conn = conn; t.ctx = ctx;
+        msg_t t; t.conn = conn; t.ctx = ctx;
         exec_cmd((char*) (intext + 1), xmpp_stanza_get_attribute(stanza, "from"), replytext, t);
     } else responses_get(intext, true, replytext);
     _message(MSG_MESSG, "response: %s", replytext);
@@ -648,12 +628,14 @@ void conn_handler(xmpp_conn_t * const conn, const xmpp_conn_event_t status, cons
     }
 }
 
+#ifdef __unix__
 void sigterm() { // termination process
     _message(MSG_WARNG, "\nTermination process...");
     // termination process {{
     // }}
     exit(0);
 }
+#endif
 
 int main(int argc, char **argv)
 {
@@ -667,6 +649,8 @@ int main(int argc, char **argv)
         fprintf(stderr, 
                 "Usage: mybot-xmpp <jid> <pass> [[--room | -r] <room-to-join>] [--accept | -a] [--response <responsefile:in>] [[--unknown | -u] <unknownquestionsfile:out>] [-d | --debug] [--security-answer | -s]\n\n"\
                 "  --room -r\t\tRoom to join\n"\
+                "  --config -c\t\tConfiguration file to load\n"\
+                "  --admins \t\tBot admins pjid's, separated with ';' character\n"\
                 "  --accept -a\t\tAccept friendship request\n"\
                 "  --response\t\tRead responses from file\n"\
                 "  --unknown \t\tWrite unknown(not in response list) questions in file\n"\
@@ -675,12 +659,14 @@ int main(int argc, char **argv)
 	return 1;
     }
     
+#ifdef __unix__
     signal(SIGINT, sigterm); // register signal for answer on exit(ctrl+c)
+#endif
     
     // initial values
-    debug=0;
     jid = argv[1];
     pass = argv[2];
+    global.system.debug=0;
     global.config.jid = jid;
     global.config.room = NULL;
     global.config.responsefile = NULL;
@@ -692,25 +678,25 @@ int main(int argc, char **argv)
         int v;
         for(v=3;v<argc;v++) {
             if(!strcmp(argv[v], "-r") || !strcmp(argv[v], "--room")) global.config.room = argv[++v]; // room to join
+            else if(!strcmp(argv[v], "--admins")) global.system.botadmins = argv[++v]; // bot administrators
             else if(!strcmp(argv[v], "--response")) global.config.responsefile = argv[++v]; // response file
             else if(!strcmp(argv[v], "-a") || !strcmp(argv[v], "--accept")) global.config.acceptfriendship = true; // accept friendrequest
-            else if(!strcmp(argv[v], "-u") || !strcmp(argv[v], "--unknown")) global.config.unknownfile = argv[++v]; // unknown file
-            else if(!strcmp(argv[v], "-d") || !strcmp(argv[v], "--debug")) debug = 1; // debug
+            else if(!strcmp(argv[v], "-c") || !strcmp(argv[v], "--config")) global.system.config_file = argv[++v]; // configuration
+            else if(!strcmp(argv[v], "-u") || !strcmp(argv[v], "--unknown")) global.config.unknownfile = argv[++v]; // unknown questions file
+            else if(!strcmp(argv[v], "-d") || !strcmp(argv[v], "--debug")) global.system.debug = 1; // debug
             else if(!strcmp(argv[v], "-s") || !strcmp(argv[v], "--security-answer")) global.config.securitypass = 1;
         }
         
-        /* getting pure JID */
-        char buf[MAX_BUFSIZE];
-	strcpy(buf, jid);
-	buf[strlen(jid)-strlen(strchr(jid, '@'))] = 0;
-        global.config.pjid = strmalloc(buf);
+        global.config.pjid = pure_jid(jid);
     }
+    
+    /* load configuration file if any */
 
     /* init library */
     xmpp_initialize();
 
     /* create a context */
-    if(debug) log = xmpp_get_default_logger(XMPP_LEVEL_DEBUG); /* pass NULL instead to silence output */
+    if(global.system.debug) log = xmpp_get_default_logger(XMPP_LEVEL_DEBUG); /* pass NULL instead to silence output */
     else log = xmpp_get_default_logger(XMPP_LEVEL_WARN);
     ctx = xmpp_ctx_new(NULL, log);
 

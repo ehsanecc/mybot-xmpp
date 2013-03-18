@@ -61,13 +61,41 @@ extern "C" {
 #define MSG_MESSG       16
 #define MSG_ATTEN       32
 #define MSG_SUB         64
-   
-
-    char debug;
     
-    int scr_x, scr_y;
+#include "datatypes.h"
+
+    struct {
+
+        struct { //  configuration variables
+            char *room; // room name
+            char *jid, *pjid; // jid, pure jid
+            char *responsefile; // answers, input file
+            char *unknownfile; // question that not understood
+            bool securitypass; // answer to security
+            bool attackflooders; // attack flooders
+            bool welcome; // say welcome to new comers
+            bool acceptfriendship; // accept friendship or not
+        } config;
+
+        struct { // status variables
+            AFFILIATION affilation; // our affiliation in room
+            bool wait; // wait state
+            bool connected; // connected to server
+            bool room_joined; // joined in room
+            bool banned; // banned from room
+        } status;
+
+        struct {
+            bool debug;
+            char *botadmins; // separated with ';' character
+            char *config_file; // configuration file address
+        } system;
+    } global; // global struct used in program
     
     void _message(MSGTYPE msgtype, char *msg, ...);
+    inline char *pure_jid(char *jid);
+    bool load_config(char *file);
+    bool isbotadmin(char *jid);
     void _init_screen(char *user, char *room);
 
 #ifdef	__cplusplus

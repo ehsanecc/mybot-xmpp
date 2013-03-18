@@ -12,8 +12,7 @@
 extern "C" {
 #endif
     
-#include "datatypes.h"
-    
+#include "../datatypes.h"
     
 #define EXACT_MATCH     '.'
 #define INTEXT_MATCH    '*'

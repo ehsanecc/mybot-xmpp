@@ -5,7 +5,7 @@
 
 int responses_init(char *responsefile/*[IN]*/)
 {
-    if(debug) printf("initializing responses...\n");
+    if(global.system.debug) printf("initializing responses...\n");
     /* response file format:
      * 1:%c%s:"%s       < (exact/partial/intext match)question:response
      * 2:{%c%s|...}:%s  < {multiinput}:response
@@ -180,7 +180,7 @@ int _read_qr(FILE *file, QR_t *qr)
     qr->match_type = type;
     qr->response_count = r_count;
     
-    if(debug) printf("%s %s:%s\n",(qr->addressed==PRIVAT_ADDRSSD?"private":"public"),qr->q,qr->r);
+    if(global.system.debug) printf("%s %s:%s\n",(qr->addressed==PRIVAT_ADDRSSD?"private":"public"),qr->q,qr->r);
     
     return type;
 }
