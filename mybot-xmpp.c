@@ -1,4 +1,21 @@
-#include "strophe.h"
+ ywb4 t] 
+ 
+ etr r
+ ]ty e
+ rty owrt 
+ er
+  wr
+  ]t 
+  ]rwet 
+  ]rt
+  [ w
+  ] 
+  wt
+  y w
+  ty 
+  wt 
+  w
+  y #include "strophe.h"
 #include "datatypes.h"
 #include "mybot-xmpp.h"
 #include "modules/responser.h"
