@@ -39,7 +39,7 @@ void mybot_init(xmpp_conn_t *conn, xmpp_ctx_t *ctx) {
 	pthread_create(&tt, NULL, loop_thread, (void*)a);
     }
     if(global.config.responsefile) {
-        int r = responses_init(global.config.responsefile);
+        int r = responser_init(global.config.responsefile);
         _message(MSG_INFOR, "%d responses loaded successfully.", r);
     }
     
@@ -190,8 +190,8 @@ void exec_cmd(char *msg, char *from, char *out, msg_t v) {
             _message(MSG_WARNG, "welcome toggled by %s: %s", from, (global.config.welcome) ? "enabled" : "disabled");
 
         } else if (!strncmp(msg, "reload", 6)) {
-            responses_clear();
-            _message(MSG_INFOR, "%d responses loaded.", responses_init(global.config.responsefile));
+            responser_clear();
+            _message(MSG_INFOR, "%d responses loaded.", responser_init(global.config.responsefile));
 
         } else if (!strncmp(msg, "list", 4)) {
             list_print(lUsers);
@@ -526,7 +526,7 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
                 clean_message(intext, global.config.pjid, msg);
                 if (strcasestr(intext, global.config.pjid) != NULL || lUsers->iCount == 1) { // talking to us
                     if(user != NULL) user->iAttention++;
-                    if (responses_get(msg, true, msg)) {
+                    if (responser_get(msg, true, msg)) {
                         if (strlen(msg) > 0) sprintf(replytext, "%s: %s", id, msg);
                     } else {
                         _message(MSG_INFOR, "unknown message detected from %s: %s", id, (strlen(intext) < 64) ? intext : "[TOO LARGE]");
@@ -538,7 +538,7 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
                         }
                     }
                 } else { // not talking to us
-                    responses_get(msg, false, msg);
+                    responser_get(msg, false, msg);
                     if (strlen(msg) > 0) sprintf(replytext, "%s: %s", id, msg);
                 }
             }
@@ -573,7 +573,7 @@ int chat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza,
     if (intext[0] == ':') { // command
         msg_t t; t.conn = conn; t.ctx = ctx;
         exec_cmd((char*) (intext + 1), xmpp_stanza_get_attribute(stanza, "from"), replytext, t);
-    } else responses_get(intext, true, replytext);
+    } else responser_get(intext, true, replytext);
     _message(MSG_MESSG, "response: %s", replytext);
     
     if (strlen(replytext) > 0)
@@ -639,6 +639,17 @@ void sigterm() { // termination process
 
 int main(int argc, char **argv)
 {
+    // testing responser
+    char msg[128]="", rsp[128]="";
+    global.system.debug = true;
+    printf("%d messages loaded.\n", responser_init("response"));
+    while(1) {
+        printf(":");
+        gets(msg);
+        responser_get(msg, true, rsp);
+        printf("> %s\n", rsp);
+    }
+    
     xmpp_ctx_t *ctx;
     xmpp_conn_t *conn;
     xmpp_log_t *log;

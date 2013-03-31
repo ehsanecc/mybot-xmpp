@@ -13,6 +13,7 @@ extern "C" {
 #endif
     
 #include <time.h>
+#include <sys/types.h>
     
     typedef enum {
         TSTRING,
@@ -93,6 +94,7 @@ extern "C" {
 #define false              0
 
 char *strmalloc(char *str); // allocate an string of str in ram
+void strshift(char *str, int shifttoright, uint maxlength); // shift string to right(left)
     
 LIST_t *mlist_init(int count, char *name, DATATYPE dtType);
 int mlist_add(LIST_t *t, void *item, char *sKey);
@@ -110,6 +112,8 @@ void mlist_free(LIST_t *t);
 USER_t *user_init(char *username, AFFILIATION aAffiliation);
 void user_free(USER_t *t);
 
+AFFILIATION str2aff(char *str);
+void aff2str(char *str, AFFILIATION aff);
 
 #ifdef	__cplusplus
 }

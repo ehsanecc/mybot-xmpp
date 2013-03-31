@@ -14,22 +14,18 @@ extern "C" {
     
 #include "../datatypes.h"
     
-#define EXACT_MATCH     '.'
-#define INTEXT_MATCH    '*'
-#define PARTIAL_MATCH   ','
-#define MULTIPLE_MATCH  '{'
-#define MULTIPLE_OR     '|'
-#define MULTIPLE_AND    '&'
+#define OPTION_FLAG     '!'
+#define COMMENT_FLAG    '#'
+    
 #define INSYSTEM_USE    '$'
 #define PUBLIC_ADDRSSD  100 // public addressed, to everyone
 #define PRIVAT_ADDRSSD  200 // private addressed, just to me(bot)
 #define UNKNOWN         ~0  // unknown
-    
+
     typedef struct {
         char *q; // question
         char *r; // response
         int response_count; // count of response
-        int match_type; // exact, partial, intext, multiple
         int addressed; // to us, to a group
     } QR_t;
     
@@ -37,14 +33,14 @@ extern "C" {
     QR_t *__qr;
     int __response_count;
     
-    int responses_init(char *responsefile/*[IN]*/);
-    int responses_clear();
-    int responses_get(char *msg/*[IN]*/, bool to_us/*[IN]*/, char *response/*[OUT]*/);
+    int responser_init(char *responsefile/*[IN]*/);
+    int responser_clear();
+    int responser_get(char *msg/*[IN]*/, bool to_us/*[IN]*/, char *response/*[OUT]*/);
     
-    // private functions(i wish i programmed this in C++ and class based)
-    void _get_response(char *response, QR_t *qr);
     int _read_qr(FILE *file, QR_t *qr);
-    int _multiplecmp(char *a, char *b);
+    int _pcre_compare(char *msg, char *regex, int *ovector, uint vectorsize);
+    void _pcre_replace(char *str, char *msg, int *ovector, uint vectors);
+    void _get_substring(char *string, uint index, char *out);
     
     int clean_message(char *msg, char *from, char *cmsg); // clean message from unneeded spaces, our ID(from)
     

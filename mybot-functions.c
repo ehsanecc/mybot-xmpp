@@ -19,7 +19,7 @@ void _message(MSGTYPE msgtype, char *msg, ...) {
     switch(msgtype & (~MSG_SUB)) {
         case MSG_DEBUG:
             if(global.system.debug)
-                sprintf(mmsg, _TCBLACK _BOLD "DD" _RESET" " _TCBLACK " %s" _RESET, msg);
+                sprintf(mmsg, _TCBLACK _BOLD "DD" _RESET" " _TCBLACK _BCWHITE " %s" _RESET, msg);
             break;
         case MSG_ERROR:
             sprintf(mmsg, _TCRED _BOLD "EE" _RESET _TCRED " %s" _RESET, msg);
@@ -88,6 +88,23 @@ bool load_config(char *file)
     
     
     return true;
+}
+
+void read_line(FILE *fp, char *buf, int bufsize) {
+    int p=0, b=0;
+    
+    do {
+        b = fgetc(fp);
+        if(buf != NULL)
+            if(b != '\r' && b != '\n')
+                buf[p++] = b;
+        
+    } while(b != '\n' && b != '\r' && !feof(fp) && p < bufsize);
+    
+    if(buf != NULL) {
+        if(buf[p-1] == '\n') buf[p-1] = 0;
+        else buf[p] = 0;
+    }
 }
 
 /* getting pure JID */

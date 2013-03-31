@@ -95,6 +95,7 @@ extern "C" {
     void _message(MSGTYPE msgtype, char *msg, ...);
     inline char *pure_jid(char *jid);
     bool load_config(char *file);
+    void read_line(FILE *fp, char *buf, int bufsize);
     bool isbotadmin(char *jid);
     void _init_screen(char *user, char *room);
 

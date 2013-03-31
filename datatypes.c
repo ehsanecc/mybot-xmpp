@@ -293,6 +293,9 @@ void user_free(USER_t *t) {
     
 }
 
+
+/* some custom string functions */
+
 char *strmalloc(char *str) {
     if (str != NULL) {
         char *r = malloc(strlen(str) + 2);
@@ -301,6 +304,20 @@ char *strmalloc(char *str) {
     } else {
         _message(MSG_DEBUG | MSG_SUB, "datatype.strmalloc( %s ): return NULL;\n", str);
         return NULL;
+    }
+}
+
+void strshift(char *str, int shifttoright, uint maxlength) {
+    int n=0,m=0;
+    const int len = strlen(str);
+    
+    if(shifttoright < 0) { // shift to left
+        shifttoright *= -1;
+        for(m=shifttoright;m<(len+1);m++,n++) str[n] = str[m];
+    } else {
+        for(m=len;m>=0;m--)
+            if((m+shifttoright) < maxlength) str[m+shifttoright] = str[m];
+        for(m=0;m<shifttoright;m++) str[m] = ' ';
     }
 }
 

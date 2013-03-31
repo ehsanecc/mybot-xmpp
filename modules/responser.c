@@ -1,220 +1,242 @@
 #include "../mybot-xmpp.h"
 #include "responser.h"
+#include <pcre.h>
 
-/* responser v1.0 */
+/* responser v2.0
+ *
+ * + Using the PCRE( Perl Compatible Regular Expression ).
+ * + 
+ */
 
-int responses_init(char *responsefile/*[IN]*/)
-{
-    if(global.system.debug) printf("initializing responses...\n");
+int responser_init(char *responsefile/*[IN]*/) {
+    if (global.system.debug) printf("initializing responses...\n");
     /* response file format:
-     * 1:%c%s:"%s       < (exact/partial/intext match)question:response
-     * 2:{%c%s|...}:%s  < {multiinput}:response
-     * 3:%c%s:{%s|%s}   < question(could be multiple):{multiple output(pick random)}
-     * 4:...
-     * 5:.              < newline for end
-     * for exact match use   '.'
-     * for partial match use ','
-     * for intext match use  '*'
-     * for multiple          { }
+     * !private          << make all qr's after it for private response
+     * !public           << make all qr's after it for public response
+     * 1 "%s":"%s"       < (exact/partial/intext match)question:response
+     * 2 "%s":{"%s"|"%s"}< {multiinput}:response
+     * 3 ...
+     * 4 .              < newline for end
+     *  multiple             { }
      *  >for separating      '|'
      * string's should be in '"'
+     * example:
+     * "i'm ([0-9]*) years old":"so you are $1 years old, right?"
      */
-    FILE *rf = fopen(responsefile, "rt");
-    
-    if(!rf) { return -1; }
-    
-    int num=0, i=0;
-    
-    while(!feof(rf)) if(fgetc(rf) == '\n') num++; // count lines( get the maximum possible QR's )
+    FILE *rf = fopen(responsefile, "rb");
+
+    if (!rf) {
+        return -1;
+    }
+
+    int num = 0, i = 0;
+
+    while (!feof(rf)) if (fgetc(rf) == '\n') num++; // count lines( get the maximum possible QR's )
     rewind(rf); // back to start of file
-    
-    __qr = (QR_t*)malloc(sizeof(QR_t)*num);
-    if(__qr == NULL) return 0;
-    
-    for(i=0;i<num && !feof(rf);i++)
-        if(!_read_qr(rf, &__qr[i])) i--;
+
+    __qr = (QR_t*) malloc(sizeof (QR_t) * num);
+    if (__qr == NULL) return 0;
+
+    for (i = 0; i < num && !feof(rf); i++)
+        if (!_read_qr(rf, &__qr[i])) i--;
     __response_count = i;
     fclose(rf);
-    
+
     return i;
 }
 
-int responses_clear()
-{
+int responser_clear() {
     int i;
-    
-    for(i=0;i<__response_count;i++) {
+
+    for (i = 0; i < __response_count; i++) {
         free(__qr[i].q);
         free(__qr[i].r);
-    } free(__qr);
+    }
+    free(__qr);
     __response_count = 0;
-    
+
     return 0;
 }
 
-int responses_get(char *msg/*[IN]*/, bool to_us/*[IN]*/, char *response/*[OUT]*/)
-{
-    int i;
-    int addressed = (to_us==true?PRIVAT_ADDRSSD:PUBLIC_ADDRSSD);
-    
+int responser_get(char *msg/*[IN]*/, bool to_us/*[IN]*/, char *response/*[OUT]*/) {
+    int i, r=0;
+    int ovector[30]={0};
+    int addressed = (to_us == true ? PRIVAT_ADDRSSD : PUBLIC_ADDRSSD);
+
     for (i = 0; i < __response_count; i++) {
         if (__qr[i].addressed == addressed) {
-            switch (__qr[i].match_type) {
-                case EXACT_MATCH: if (!strcasecmp(msg, __qr[i].q)) { _get_response(response, &__qr[i]); return 1; } break;
-                case INTEXT_MATCH: if (strcasestr(msg, __qr[i].q) != NULL) { _get_response(response, &__qr[i]); return 1; } break;
-                case PARTIAL_MATCH: if (!strncasecmp(msg, __qr[i].q, strlen(__qr[i].q))) { _get_response(response, &__qr[i]); return 1; } break;
-                case MULTIPLE_MATCH: if (!_multiplecmp(msg, __qr[i].q)) { _get_response(response, &__qr[i]); return 1; } break;
+            r = _pcre_compare(msg, __qr[i].q, ovector, 30);
+            if (r >= 0) { // match
+                if(__qr[i].response_count > 1) _get_substring(__qr[i].r, ((unsigned)_rand())%__qr[i].response_count, response);
+                else strcpy(response, __qr[i].r);
+                _pcre_replace(response, msg, ovector, r);
+                return 1;
             }
+
         }
     }
     strcpy(response, ""); // no response
-    
+
     return 0;
 }
 
-int _qparse(char *msg, char *q) {
-    int i=0, n=0, type=0, l;
-    char Q[MAX_BUFSIZE];
-    
-    // expected sample q is: {{."text1"|."text2"}&,"text3"}
-    // or more complex
-    
-    while(q[i]) {
-        if(q[i] == EXACT_MATCH)
-            if (!strcasecmp(msg, q +1)) return 1;
-        else if(q[i] == INTEXT_MATCH)
-            if (strcasestr(msg,  q +1) != NULL) return 1;
-        else if(q[i] == PARTIAL_MATCH)
-            if (!strncasecmp(msg, q +1, strlen(q +1))) return 1;
-        else if(q[i] == MULTIPLE_MATCH) {
-            
-        }
-        
-        i++; n=0;
-    }
-}
+int _read_qr(FILE *file, QR_t *qr) {
+    int n = 0, b = fgetc(file), r_count = 1;
+    bool bstring=false;
+    char q[MAX_BUFSIZE]={0}, r[MAX_BUFSIZE]={0};
+    static int line = 0, addressed = PRIVAT_ADDRSSD; // by default, all messages are for private addressed
 
-void _get_response(char *response, QR_t *qr) // low level get_response(mostly for handling multiple answers)
-{
-    if(qr->response_count > 1) {
-        int n=_rand()%qr->response_count, i, p=1;
-        for(i=0;i<n;i++) { while(qr->r[p++] != '|'); } i=0; // skip
-        while(qr->r[p] && qr->r[p] != '|' && qr->r[p] != '}') response[i++] = qr->r[p++];
-        response[i]=0;
-    } else strcpy(response, qr->r);
-}
-
-int _multiplecmp(char *msg, char *q)
-{
-    int i=0, n=0, type=0, l;
-    char buf[MAX_BUFSIZE];
-    
-    // {{.salam|.khodafez}&.bye}
-    //  {.salam|.khodafez}&.bye}
-    
-    while(q[i] && q[i]!=':') {
-        if(q[i]=='|' || q[i]=='}') // separate character
-        {
-            buf[n] = 0; n=0;
-            type = buf[0];
-            buf[MAX_BUFSIZE-1] = strlen(buf); // store length of buf somewhere safe!
-            for(l=0;l<buf[MAX_BUFSIZE-1];l++) buf[l] = buf[l+1]; // shift left
-            switch(type) {
-                case EXACT_MATCH: if(!strcasecmp(msg, buf)) return 0; break;
-                case INTEXT_MATCH: if(strcasestr(msg, buf) != NULL) return 0; break;
-                case PARTIAL_MATCH: if(!strncasecmp(msg, buf, strlen(buf))) return 0; break;
-                case MULTIPLE_MATCH: if(!_multiplecmp(msg, buf)) return 0; break;
-            }
-        } else buf[n++] = q[i];
-        
-        i++;
-    }
-    
-    return 1;
-}
-
-int _read_qr(FILE *file, QR_t *qr)
-{
-    int n=0, b=fgetc(file), type, r_count = 1;
-    char q[MAX_BUFSIZE], r[MAX_BUFSIZE];
-    static int addressed = PRIVAT_ADDRSSD; // by default, all messages are for private addressed
-    
-    if(feof(file)) return 0;
+    if (feof(file)) return 0;
     
     switch (b) {
-        case '.': type = EXACT_MATCH; break;
-        case ',': type = PARTIAL_MATCH; break;
-        case '*': type = INTEXT_MATCH; break;
-        case '{': type = MULTIPLE_MATCH; break;
-        case '!':
-            b = fgetc(file);
-            while (b != '\n' && !feof(file)) { q[n++] = b; b = fgetc(file); } q[n] = 0; // read-line
+        case '"': bstring = true; break;
+        case OPTION_FLAG:
+            read_line(file, q, MAX_BUFSIZE); line++;
             if (!strcasecmp(q, "public")) addressed = PUBLIC_ADDRSSD;
             else if (!strcasecmp(q, "private")) addressed = PRIVAT_ADDRSSD;
             return 0;
-            break;
-        case '\n': return 0; break;
-        default: // skip a line then return
-            while (fgetc(file) != '\n' && !feof(file));
+        case '\n':
+            line++;
+            return 0;
+        default:
+            if(b != COMMENT_FLAG) _message(MSG_ERROR, "%d: unexpected character '%c'.", line, b);
+            read_line(file, NULL, MAX_BUFSIZE); line++;
             return 0;
     }
 
-    b=fgetc(file);
-    while(b!=':' && n < MAX_BUFSIZE && !feof(file)) {
+    b = fgetc(file);
+    while ((bstring == true || b != ':') && n < MAX_BUFSIZE && !feof(file)) {
+        if(b == '"') bstring = !bstring;
+        else if(b == '\\') {
+            b = fgetc(file);
+            switch(b) {
+                case 'n': b = '\n'; break;
+                case 't': b = '\t'; break;
+                case 'r': b = '\r'; break;
+            }
+        }
         q[n++] = b;
-        b=fgetc(file);
-    } q[n] = 0;
+        b = fgetc(file);
+    }
+    q[n-1] = 0;
     
-    n=0, b=fgetc(file);
-    while(b!='\n' && n < MAX_BUFSIZE && !feof(file)) {
-        r[n++] = b;
-        b=fgetc(file);
-    } r[n] = 0;
+    read_line(file, r, MAX_BUFSIZE); line++;
+    strshift(r, -1, MAX_BUFSIZE);
+    r[strlen(r)-1] = 0;
     
     // count responses
-    n = 0; if (r[0] == '{') while (r[n]) if(r[n++] == '|') r_count++;
-    
-    qr->q = malloc(strlen(q)+1); strcpy(qr->q, q);
-    qr->r = malloc(strlen(r)+1); strcpy(qr->r, r);
+    n = 0;
+    bstring = false;
+    while (r[n]) {
+        if (r[n] == '|' && bstring == false) r_count++;
+        else if (r[n] == '\\') n++;
+        else if (r[n] == '"') bstring = !bstring;
+        n++;
+    }
+
+    qr->q = strmalloc(q);
+    qr->r = strmalloc(r);
     qr->addressed = addressed;
-    qr->match_type = type;
     qr->response_count = r_count;
-    
-    if(global.system.debug) printf("%s %s:%s\n",(qr->addressed==PRIVAT_ADDRSSD?"private":"public"),qr->q,qr->r);
-    
-    return type;
+
+    _message(MSG_DEBUG, "%s %s:%s[%d]\n", (qr->addressed == PRIVAT_ADDRSSD ? "private" : "public"), qr->q, qr->r, qr->response_count);
+
+    return 1;
 }
 
-/* clear message from "from" string
- */
-int clean_message(char *msg, char *from, char *cmsg)
-{
-    if(strcasestr(msg, from) == NULL) { strcpy(cmsg,msg); return 0; }
-    
-    int ml = strlen(msg), fl = strlen(from), n, m, i=0;
+/* will separate and select a sub string in a multiple string { } */
+void _get_substring(char *string, uint index, char *out) {
+    _message(MSG_DEBUG, "responser._get_substring(%s, %u, [OUT])", string, index);
+    uint i, p=0, len = strlen(string), string_length = 0;
+    char *string_start = string;
+    bool bstring = false;
 
-    n = abs((int)msg - (int)strcasestr(msg, from));
-    for(i=0;i<n;i++) cmsg[i] = msg[i];
-    for(m=n+fl+1;m<ml;m++) cmsg[i++] = msg[m];
-    while(cmsg[0]==' ') // strip string
-    {
-        ml = strlen(cmsg);
-        for(n=0;n<ml;n++) cmsg[n] = cmsg[n+1]; // shift left
+    /* format: "str"|"str"|...
+     * str as string!
+     */
+    for(i=0;i<=index;i++) {
+        string_length = 0;
+        do {
+            if(string[p] == '\\') p++; // skip the next character
+            else if(string[p] == '"') {
+                bstring = !bstring;
+                if(bstring) string_start = string+p+1; // start of a string
+            } else string_length++;
+            p++;
+        } while(p < len && bstring);
+        if(string[p] != '|' && string[p] != 0) _message(MSG_ERROR, "responser: unexpected character.");
+        else p++;
     }
     
-    if(!clean_message(cmsg, from, cmsg)) return 0;
+    sprintf(out, "%.*s", string_length, string_start);
+}
+
+int _pcre_compare(char *msg, char *regex, int *ovector, uint vectorsize) {
+    pcre *p;
+    const char *error;
+    unsigned char tptr[32];
+    int of, r;
+
+    p = pcre_compile(regex, 0, &error, &of, tptr);
+    if (p == NULL) {
+        _message(MSG_ERROR, "responser._pcre error: %s", error);
+        return -1;
+    }
+    r = pcre_exec(p, NULL, msg, strlen(msg), 0, 0, ovector, vectorsize);
+
+    return r;
+}
+
+void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
+    uint i=0, n;
+    char buf[MAX_BUFSIZE] = "";
+
+    while(str[i])
+    {
+        if (str[i] == '$') {
+            n = atoi(str+(++i));
+            if(n <= vectors) {
+                char *substring_start = msg + ovector[2 * n];
+                uint substring_length = ovector[2 * n + 1] - ovector[2 * n];
+                sprintf(buf, "%.*s%.*s%s", i-1, str, substring_length, substring_start, str + i + 1);
+                strcpy(str, buf);
+            }
+        } i++;
+    }
+}
+
+/* 
+ * clear message from "from" string
+ */
+int clean_message(char *msg, char *from, char *cmsg) {
+    if (strcasestr(msg, from) == NULL) {
+        strcpy(cmsg, msg);
+        return 0;
+    }
+
+    int ml = strlen(msg), fl = strlen(from), n, m, i = 0;
+
+    n = abs((int) msg - (int) strcasestr(msg, from));
+    for (i = 0; i < n; i++) cmsg[i] = msg[i];
+    for (m = n + fl + 1; m < ml; m++) cmsg[i++] = msg[m];
+    while (cmsg[0] == ' ') // strip string
+    {
+        ml = strlen(cmsg);
+        for (n = 0; n < ml; n++) cmsg[n] = cmsg[n + 1]; // shift left
+    }
+
+    if (!clean_message(cmsg, from, cmsg)) return 0;
 }
 
 /* try to answer security questions of specially nimbuzz, it's a guess
- * based on specified format, if format changes, this will not useful
+ * based on specified format, if format changes, this will not useful(should change in time)
  */
-void get_security_answer(char *question, char *answer)
-{
-    int n=0,a=0,l=strlen(question);
-    
+void get_security_answer(char *question, char *answer) {
+    int n = 0, a = 0, l = strlen(question);
+
     /*internal function*/
     int read_number(const char *b) {
-        if(b[0] <= '9' && b[0] >= '0') return atoi(b);
+        if (b[0] <= '9' && b[0] >= '0') return atoi(b);
         else if (!strncmp(b, "eleven", 6)) return 11;
         else if (!strncmp(b, "twelve", 6)) return 12;
         else if (!strncmp(b, "thirteen", 8)) return 13;
@@ -247,32 +269,32 @@ void get_security_answer(char *question, char *answer)
         else if (!strncmp(b, "thousand", 8)) return 1000;
         else return -1;
     }
-    
-    while(question[a++]!='\n'); // skip first line
-    
+
+    while (question[a++] != '\n'); // skip first line
+
     // if '= ...' is in there
-    if(strstr((char*)(question+a), "= ...") != NULL) {
-        int x,y=0;
-        x = read_number((char*) (question+a));
-        for(n=a;n<l;n++) {
-            if(question[n] == '-' || question[n] == '+' || question[n] == '*') {
-                y = read_number((question+n+2));
-                if(question[n] == '-') sprintf(answer, "%d", x-y);
-                else if(question[n] == '+') sprintf(answer, "%d", x+y);
-                else if(question[n] == '*') sprintf(answer, "%d", x*y);
+    if (strstr((char*) (question + a), "= ...") != NULL) {
+        int x, y = 0;
+        x = read_number((char*) (question + a));
+        for (n = a; n < l; n++) {
+            if (question[n] == '-' || question[n] == '+' || question[n] == '*') {
+                y = read_number((question + n + 2));
+                if (question[n] == '-') sprintf(answer, "%d", x - y);
+                else if (question[n] == '+') sprintf(answer, "%d", x + y);
+                else if (question[n] == '*') sprintf(answer, "%d", x * y);
                 break;
             }
         }
-    }
-    // What is ninety-five thousand nine hundred sixteen as digits?
-    else if(strstr((char*)(question+a), "as digits") != NULL) {
-        int result = 0, r[10]={0}, p=8, i=0;
+    }        // What is ninety-five thousand nine hundred sixteen as digits?
+    else if (strstr((char*) (question + a), "as digits") != NULL) {
+        int result = 0, r[10] = {0}, p = 8, i = 0;
         do {
             r[i] = read_number(question + a + p);
             while (((char*) question + a)[p] && ((char*) question + a)[p] != '-' && ((char*) question + a)[p] != ' ') p++;
             if (((char*) question + a)[p] == 0) break;
             else p++;
-        } while (r[i++] != -1 && i < 10); i--;
+        } while (r[i++] != -1 && i < 10);
+        i--;
         for (p = 0; p < i; p++) {
             if (r[p + 1] == 1000) {
                 result += r[p];
@@ -286,17 +308,15 @@ void get_security_answer(char *question, char *answer)
             }
         }
         sprintf(answer, "%d", result);
-    }
-    // What is the 2nd digit of 99100?
-    else if(strstr((char*)(question+a), "digit") != NULL) {
-        int x,y;
-        x = read_number((char*)(question+a+12));
-        sprintf(answer, "%c", question[a+24+x]);
-    }
-    //Of the numbers fourteen, 29 and 16, which is the smallest?
-    //Of the numbers sixty-six, seven, 35, sixty-six and 45, which is the smallest?
-    else if(strstr((char*)(question+a), "Of the numbers") != NULL) {
-        int result=0, r[10]={0}, p=15, i=0;
+    }        // What is the 2nd digit of 99100?
+    else if (strstr((char*) (question + a), "digit") != NULL) {
+        int x, y;
+        x = read_number((char*) (question + a + 12));
+        sprintf(answer, "%c", question[a + 24 + x]);
+    }        //Of the numbers fourteen, 29 and 16, which is the smallest?
+        //Of the numbers sixty-six, seven, 35, sixty-six and 45, which is the smallest?
+    else if (strstr((char*) (question + a), "Of the numbers") != NULL) {
+        int result = 0, r[10] = {0}, p = 15, i = 0;
         do {
             r[i] = read_number(question + a + p);
             while (((char*) question + a)[p] && ((char*) question + a)[p] != '-' && ((char*) question + a)[p] != ' ') p++;
@@ -306,24 +326,23 @@ void get_security_answer(char *question, char *answer)
                 r[i] += read_number(question + a + p);
                 while (((char*) question + a)[p] && ((char*) question + a)[p] != '-' && ((char*) question + a)[p] != ' ') p++;
                 if (((char*) question + a)[p] != 0) p++;
-            }
-            else p++;
-            
-            if (((char*) question + a)[p] == 'a' && ((char*) question + a)[p+1] == 'n' && ((char*) question + a)[p+2] == 'd') p+=4;
-        } while (r[i++] != -1 && i < 10); i--;
-        
-        if(strstr((char*)(question+a), "smallest") != NULL) { // find smallest
+            } else p++;
+
+            if (((char*) question + a)[p] == 'a' && ((char*) question + a)[p + 1] == 'n' && ((char*) question + a)[p + 2] == 'd') p += 4;
+        } while (r[i++] != -1 && i < 10);
+        i--;
+
+        if (strstr((char*) (question + a), "smallest") != NULL) { // find smallest
             result = r[0];
-            for(p=0;p<i;p++) if(r[p] < result) result = r[p];
+            for (p = 0; p < i; p++) if (r[p] < result) result = r[p];
         } else { // find biggest!
-            for(p=0;p<i;p++) if(r[p] > result) result = r[p];
+            for (p = 0; p < i; p++) if (r[p] > result) result = r[p];
         }
         sprintf(answer, "%d", result);
-    }
-    // The 3rd number of 85, zero, ninety-one and 0 is?
-    else if(strstr((char*)(question+a), "The ") != NULL && strstr((char*)(question+a), "number of ") != NULL) {
-        int r[10]={0}, p=18, i=1;
-        r[0] = read_number(question+a+4);
+    }        // The 3rd number of 85, zero, ninety-one and 0 is?
+    else if (strstr((char*) (question + a), "The ") != NULL && strstr((char*) (question + a), "number of ") != NULL) {
+        int r[10] = {0}, p = 18, i = 1;
+        r[0] = read_number(question + a + 4);
         do {
             r[i] = read_number(question + a + p);
             while (((char*) question + a)[p] && ((char*) question + a)[p] != '-' && ((char*) question + a)[p] != ' ') p++;
@@ -333,11 +352,11 @@ void get_security_answer(char *question, char *answer)
                 r[i] += read_number(question + a + p);
                 while (((char*) question + a)[p] && ((char*) question + a)[p] != '-' && ((char*) question + a)[p] != ' ') p++;
                 if (((char*) question + a)[p] != 0) p++;
-            }
-            else p++;
-            
-            if (((char*) question + a)[p] == 'a' && ((char*) question + a)[p+1] == 'n' && ((char*) question + a)[p+2] == 'd') p+=4;
-        } while (r[i++] != -1 && i < 10); i--;
+            } else p++;
+
+            if (((char*) question + a)[p] == 'a' && ((char*) question + a)[p + 1] == 'n' && ((char*) question + a)[p + 2] == 'd') p += 4;
+        } while (r[i++] != -1 && i < 10);
+        i--;
         sprintf(answer, "%d", r[r[0]]);
     }
 }
