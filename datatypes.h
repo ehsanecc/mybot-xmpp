@@ -89,7 +89,7 @@ extern "C" {
 
     typedef unsigned char bool;
 #define MAX_BUFSIZE     8192    // 8KiB
-#define MAX_JID          512    // 256 * 2 (for unicode)
+#define MAX_JID         1024    // 256 * 4 (for unicode)
 #define true               1
 #define false              0
 

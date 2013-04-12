@@ -370,7 +370,7 @@ int presence_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, voi
             xmpp_stanza_t *item = (xmpp_stanza_get_child_by_name(stanza, "x") != NULL ? xmpp_stanza_get_child_by_name(xmpp_stanza_get_child_by_name(stanza, "x"), "item") : NULL);
             
             if (xmpp_stanza_get_type(stanza) == NULL && item != NULL && xmpp_stanza_get_child_by_name(item, "actor") == NULL) {
-                char msg[MAX_BUFSIZE], id[MAX_BUFSIZE];
+                char msg[MAX_BUFSIZE], id[MAX_JID];
                 if (xmpp_stanza_get_attribute(item, "jid") != NULL) {
                     strcpy(id, xmpp_stanza_get_attribute(item, "jid"));
                     id[strlen(id) - strlen(strchr(id, '@'))] = 0;
@@ -380,7 +380,8 @@ int presence_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, voi
                 if (strcmp(id, global.config.pjid)) { // not say hello to myself!
                     if (global.config.welcome) {
                         // welcome
-                        sprintf(msg, rpckup("salam %s", rpckup(rpckup("khosh umadi %s", rpckup(rpckup("welcome %s", rpckup("kheili khosh umadi %s", "Wb %s")), "slm %s")), "dorood bar to %s")), id);
+                        responser_get(NULL, FLG_WELCOME, id, msg);
+                        //sprintf(msg, rpckup("salam %s", rpckup(rpckup("khosh umadi %s", rpckup(rpckup("welcome %s", rpckup("kheili khosh umadi %s", "Wb %s")), "slm %s")), "dorood bar to %s")), id);
                         send_message(xmpp_stanza_get_attribute(stanza, "from"), msg, "groupchat", conn, (xmpp_ctx_t*) userdata);
                     }
                 } else { // presence of us
@@ -523,22 +524,22 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
 
             } else if (!repeat) { // not repeated message
                 char msg[MAX_BUFSIZE] = "";
-                clean_message(intext, global.config.pjid, msg);
-                if (strcasestr(intext, global.config.pjid) != NULL || lUsers->iCount == 1) { // talking to us
+                responser_clean_message(intext, global.config.pjid, msg);
+                if (strcstr(intext, global.config.pjid) != NULL || lUsers->iCount == 1) { // talking to us
                     if(user != NULL) user->iAttention++;
-                    if (responser_get(msg, true, msg)) {
+                    if (responser_get(msg, FLG_PRIVATE, id, msg)) {
                         if (strlen(msg) > 0) sprintf(replytext, "%s: %s", id, msg);
                     } else {
                         _message(MSG_INFOR, "unknown message detected from %s: %s", id, (strlen(intext) < 64) ? intext : "[TOO LARGE]");
                         if (global.config.unknownfile != NULL) {
                             FILE *f = fopen(global.config.unknownfile, "a+");
-                            clean_message(intext, global.config.pjid, msg);
+                            responser_clean_message(intext, global.config.pjid, msg);
                             fprintf(f, "\n%s", msg);
                             fclose(f);
                         }
                     }
                 } else { // not talking to us
-                    responser_get(msg, false, msg);
+                    responser_get(msg, FLG_PUBLIC, id, msg);
                     if (strlen(msg) > 0) sprintf(replytext, "%s: %s", id, msg);
                 }
             }
@@ -547,7 +548,7 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
     
     if (strlen(replytext) > 0)
         send_message(xmpp_stanza_get_attribute(stanza, "from"), replytext, xmpp_stanza_get_type(stanza), conn, (xmpp_ctx_t*) userdata);
-
+    
     return 1;
 }
 
@@ -558,6 +559,9 @@ int chat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza,
     
     if (!xmpp_stanza_get_child_by_name(stanza, "body")) return 1;
     if (!strcmp(xmpp_stanza_get_attribute(stanza, "type"), "error")) return 1;
+    
+    id = xmpp_stanza_get_attribute(stanza, "from");
+    if(global.config.room != NULL && strstr(id, global.config.room) != NULL) id += strlen(global.config.room) + 1;
     
     intext = xmpp_stanza_get_text(xmpp_stanza_get_child_by_name(stanza, "body"));
     if (intext == NULL || strlen(intext) == 0) return 1;
@@ -573,12 +577,12 @@ int chat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza,
     if (intext[0] == ':') { // command
         msg_t t; t.conn = conn; t.ctx = ctx;
         exec_cmd((char*) (intext + 1), xmpp_stanza_get_attribute(stanza, "from"), replytext, t);
-    } else responser_get(intext, true, replytext);
+    } else responser_get(intext, FLG_PRIVATE, id, replytext);
     _message(MSG_MESSG, "response: %s", replytext);
     
     if (strlen(replytext) > 0)
         send_message(xmpp_stanza_get_attribute(stanza, "from"), replytext, xmpp_stanza_get_type(stanza), conn, (xmpp_ctx_t*) userdata);
-
+    
     return 1;
 }
 
@@ -588,7 +592,7 @@ void connect_to_room(xmpp_conn_t * const conn, xmpp_ctx_t *ctx) {
     
     _message(MSG_INFOR, "connecting to room %s", global.config.room);
     char *rroom = malloc(strlen(global.config.room) + strlen(global.config.pjid) + 4);
-    strcpy(rroom, global.config.room); strcat(rroom, "/"); strcat(rroom, global.config.pjid);
+    sprintf(rroom, "%s/%s", global.config.room, global.config.pjid);
     pres = xmpp_stanza_new(ctx);
     xmpp_stanza_set_name(pres, "presence");
     xmpp_stanza_set_attribute(pres, "to", rroom);
@@ -596,6 +600,7 @@ void connect_to_room(xmpp_conn_t * const conn, xmpp_ctx_t *ctx) {
     xmpp_stanza_release(pres);
     free(rroom);
 }
+
 /* define a handler for connection events */
 void conn_handler(xmpp_conn_t * const conn, const xmpp_conn_event_t status, const int error, xmpp_stream_error_t * const stream_error, void * const userdata) {
     _message(MSG_DEBUG, "main.conn_handler(...);");
@@ -640,15 +645,15 @@ void sigterm() { // termination process
 int main(int argc, char **argv)
 {
     // testing responser
-    char msg[128]="", rsp[128]="";
+    /*char msg[128]="", rsp[128]="";
     global.system.debug = true;
     printf("%d messages loaded.\n", responser_init("response"));
     while(1) {
         printf(":");
         gets(msg);
-        responser_get(msg, true, rsp);
+        responser_get(msg, FLG_PRIVATE, "ESI", rsp);
         printf("> %s\n", rsp);
-    }
+    }*/
     
     xmpp_ctx_t *ctx;
     xmpp_conn_t *conn;

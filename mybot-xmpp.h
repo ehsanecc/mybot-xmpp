@@ -19,6 +19,7 @@ extern "C" {
 #include <pthread.h>
 #include <stdarg.h>
 #include <signal.h>
+#include <ctype.h>
     
     
     // ANSI output text format
@@ -96,6 +97,8 @@ extern "C" {
     inline char *pure_jid(char *jid);
     bool load_config(char *file);
     void read_line(FILE *fp, char *buf, int bufsize);
+    inline void tolowers(char *string);
+    char *strcstr(char *string, char *needle);
     bool isbotadmin(char *jid);
     void _init_screen(char *user, char *room);
 
