@@ -5,8 +5,6 @@
 
 /*
  * This project finally started!
- * since all features SHOULD be configurable thorugh config files,
- * it's really better to make it script base(in response of course)
  */
 
 typedef struct {
@@ -256,6 +254,7 @@ void *loop_thread(void *ptr) {
     while (1) {
         if (global.status.connected) {
             if (global.status.room_joined) {
+                // on joined
                 for (delay = 0; delay < 40 && global.status.room_joined == true; delay++) {
                     sleep(6);
                     if (global.config.attackflooders == true && (lFlood != NULL && (lFlood->iCount >= 4 || ((delay % 6) == 0) && lFlood->iCount > 0))) {
@@ -333,7 +332,7 @@ int version_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, void
     xmpp_stanza_add_child(query, name);
 
     text = xmpp_stanza_new(ctx);
-    xmpp_stanza_set_text(text, "trying to make it more comfortable, more intelligent, hope i reach my goal.\n\npero.");
+    xmpp_stanza_set_text(text, "trying to make it more comfortable, more intelligent, hope i reach my goal.\n\npero.\n\n\n * contact me: pero_p@nimbuzz.com");
     xmpp_stanza_add_child(name, text);
 
     version = xmpp_stanza_new(ctx);
@@ -341,7 +340,7 @@ int version_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, void
     xmpp_stanza_add_child(query, version);
 
     text = xmpp_stanza_new(ctx);
-    xmpp_stanza_set_text(text, "0.9");
+    xmpp_stanza_set_text(text, "0.9.2");
     xmpp_stanza_add_child(version, text);
 
     xmpp_stanza_add_child(reply, query);
@@ -427,7 +426,11 @@ int presence_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, voi
                     _message(MSG_ATTEN, "%s banned by %s!", from, actor);
                     global.status.banned = true;
                 }
-                else if(!strcmp(affiliation, "none")) _message(MSG_ATTEN, "%s kicked by %s!", from, actor);
+                else if(!strcmp(affiliation, "none")) {
+                    _message(MSG_ATTEN, "%s kicked by %s!", from, actor);
+                    if(!strcmp(from, global.config.pjid)) // it's me!
+                        global.status.room_joined = false;
+                }
                 else _message(MSG_ATTEN, "%s is now (affiliation:%s & role:%s) by %s!", from, affiliation, role, actor);
                 
                 // update user list
@@ -482,7 +485,7 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
         time_t tt = time(NULL);
         USER_t *user = mlist_get(lUsers, id, 0);
         strftime(stime, 32, "%H:%M:%S", localtime(&tt));
-        _message(MSG_MESSG, "%s%s[%s]%s>"_RESET"%s", ((strstr(intext, global.config.pjid) != NULL) ? _BOLD _TCYELLOW : _TCYELLOW), ((user != NULL) && (user->aAffiliation == AFF_ADMIN || user->aAffiliation == AFF_OWNER) ? _TCRED : ""), stime, (strchr(xmpp_stanza_get_attribute(stanza, "from"), '/') != NULL) ? strchr(xmpp_stanza_get_attribute(stanza, "from"), '/') + 1 : "(null)", intext);
+        _message(MSG_MESSG, "%s%s[%s]%s>"_RESET"%s", ((strstr(intext, global.config.pjid) != NULL) ? _BOLD _TCYELLOW : _TCYELLOW), ((user != NULL) && (user->aAffiliation == AFF_ADMIN || user->aAffiliation == AFF_OWNER) ? _TCRED : (isbotadmin(id) ? _TCBLUE : "")), stime, (strchr(xmpp_stanza_get_attribute(stanza, "from"), '/') != NULL) ? strchr(xmpp_stanza_get_attribute(stanza, "from"), '/') + 1 : "(null)", intext);
     }
     // if admin says "Enter the right answer to start chatting" then we should answer:
     if (!strcmp(id, "admin") && strstr(intext, "Enter the right answer to start chatting") != NULL) {
@@ -525,18 +528,13 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
             } else if (!repeat) { // not repeated message
                 char msg[MAX_BUFSIZE] = "";
                 responser_clean_message(intext, global.config.pjid, msg);
-                if (strcstr(intext, global.config.pjid) != NULL || lUsers->iCount == 1) { // talking to us
-                    if(user != NULL) user->iAttention++;
+                if (user != NULL && (strcstr(intext, global.config.pjid) != NULL || lUsers->iCount == 1)) { // talking to us
+                    user->iAttention++;
                     if (responser_get(msg, FLG_PRIVATE, id, msg)) {
                         if (strlen(msg) > 0) sprintf(replytext, "%s: %s", id, msg);
                     } else {
-                        _message(MSG_INFOR, "unknown message detected from %s: %s", id, (strlen(intext) < 64) ? intext : "[TOO LARGE]");
-                        if (global.config.unknownfile != NULL) {
-                            FILE *f = fopen(global.config.unknownfile, "a+");
-                            responser_clean_message(intext, global.config.pjid, msg);
-                            fprintf(f, "\n%s", msg);
-                            fclose(f);
-                        }
+                        _message(MSG_INFOR, "unknown message from '%s': %s", id, (strlen(intext) < 64) ? intext : "[TOO LARGE]");
+                        if (global.config.unknownfile != NULL) log_unknown(intext);
                     }
                 } else { // not talking to us
                     responser_get(msg, FLG_PUBLIC, id, msg);
@@ -623,9 +621,6 @@ void conn_handler(xmpp_conn_t * const conn, const xmpp_conn_event_t status, cons
         xmpp_send(conn, pres);
         _message(MSG_DEBUG, "%s", xmpp_stanza_get_type(pres));
         xmpp_stanza_release(pres);
-
-        // try to make a connection to room
-        // connect_to_room(conn, ctx);
     } else {
         global.status.connected = false;
         _message(MSG_DEBUG, "disconnected");
@@ -644,17 +639,6 @@ void sigterm() { // termination process
 
 int main(int argc, char **argv)
 {
-    // testing responser
-    /*char msg[128]="", rsp[128]="";
-    global.system.debug = true;
-    printf("%d messages loaded.\n", responser_init("response"));
-    while(1) {
-        printf(":");
-        gets(msg);
-        responser_get(msg, FLG_PRIVATE, "ESI", rsp);
-        printf("> %s\n", rsp);
-    }*/
-    
     xmpp_ctx_t *ctx;
     xmpp_conn_t *conn;
     xmpp_log_t *log;
@@ -665,12 +649,18 @@ int main(int argc, char **argv)
         fprintf(stderr, 
                 "Usage: mybot-xmpp <jid> <pass> [[--room | -r] <room-to-join>] [--accept | -a] [--response <responsefile:in>] [[--unknown | -u] <unknownquestionsfile:out>] [-d | --debug] [--security-answer | -s]\n\n"\
                 "  --room -r\t\tRoom to join\n"\
+                "  --level -l <int> \tLog level ( Error Warning Message Information Debug )\n"\
+                "       0 - E\n"\
+                "       1 - EW \n"\
+                "       2 - EWM\n"\
+                "       3 - EWMI\n"\
+                "       4 - EWMID ( everything )\n"\
                 "  --config -c\t\tConfiguration file to load\n"\
+                "  --force -f\t\tForce robot to being alive\n"\
                 "  --admins \t\tBot admins pjid's, separated with ';' character\n"\
                 "  --accept -a\t\tAccept friendship request\n"\
                 "  --response\t\tRead responses from file\n"\
                 "  --unknown \t\tWrite unknown(not in response list) questions in file\n"\
-                "  --debug -d\t\tEnable debug mode\n"\
                 "  --security-answer\tAnswer automatically to security questions\n");
 	return 1;
     }
@@ -682,7 +672,7 @@ int main(int argc, char **argv)
     // initial values
     jid = argv[1];
     pass = argv[2];
-    global.system.debug=0;
+    global.system.log_level=2; // default log level
     global.config.jid = jid;
     global.config.room = NULL;
     global.config.responsefile = NULL;
@@ -699,8 +689,13 @@ int main(int argc, char **argv)
             else if(!strcmp(argv[v], "-a") || !strcmp(argv[v], "--accept")) global.config.acceptfriendship = true; // accept friendrequest
             else if(!strcmp(argv[v], "-c") || !strcmp(argv[v], "--config")) global.system.config_file = argv[++v]; // configuration
             else if(!strcmp(argv[v], "-u") || !strcmp(argv[v], "--unknown")) global.config.unknownfile = argv[++v]; // unknown questions file
-            else if(!strcmp(argv[v], "-d") || !strcmp(argv[v], "--debug")) global.system.debug = 1; // debug
-            else if(!strcmp(argv[v], "-s") || !strcmp(argv[v], "--security-answer")) global.config.securitypass = 1;
+            else if(!strcmp(argv[v], "-l") || !strcmp(argv[v], "--level")) global.system.log_level = (uint) atoi(argv[++v]); // log level
+            else if(!strcmp(argv[v], "-s") || !strcmp(argv[v], "--security-answer")) global.config.securitypass = true;
+            else if(!strcmp(argv[v], "-f") || !strcmp(argv[v], "--force")) global.config.force = true;
+            else {
+                fprintf(stderr, "unknown option '%s'.\nrun without argument to get help\n\n", argv[v]);
+                exit(1);
+            }
         }
         
         global.config.pjid = pure_jid(jid);
@@ -712,7 +707,7 @@ int main(int argc, char **argv)
     xmpp_initialize();
 
     /* create a context */
-    if(global.system.debug) log = xmpp_get_default_logger(XMPP_LEVEL_DEBUG); /* pass NULL instead to silence output */
+    if (global.system.log_level == 4) log = xmpp_get_default_logger(XMPP_LEVEL_DEBUG); /* pass NULL instead to silence output */
     else log = xmpp_get_default_logger(XMPP_LEVEL_WARN);
     ctx = xmpp_ctx_new(NULL, log);
 
@@ -725,13 +720,13 @@ int main(int argc, char **argv)
 
     /* initiate connection */
     xmpp_connect_client(conn, NULL, 0, conn_handler, ctx);
-    
+
     /* initiate bot */
     mybot_init(conn, ctx);
-    
+
     /* enter the event loop - 
        our connect handler will trigger an exit */
-    xmpp_run(ctx);
+    do xmpp_run(ctx); while(global.config.force);
 
     /* release our connection and context */
     xmpp_conn_release(conn);

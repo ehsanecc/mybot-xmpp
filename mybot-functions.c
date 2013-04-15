@@ -1,10 +1,6 @@
 #include "mybot-xmpp.h"
 #include "datatypes.h"
 
-// not-grouped functions, well collapse here {{
-inline int _rand();
-inline char *rpckup(char *a, char *b); // random pickup
-
 void _message(MSGTYPE msgtype, char *msg, ...) {
     va_list va;
     va_start(va, msg);
@@ -20,26 +16,28 @@ void _message(MSGTYPE msgtype, char *msg, ...) {
     
     switch(msgtype & (~MSG_SUB)) {
         case MSG_DEBUG:
-            if(global.system.debug)
+            if(global.system.log_level == 4)
                 sprintf(mmsg, _TCBLACK _BOLD "DD" _RESET" " _TCBLACK _BCWHITE " %s" _RESET, msg);
             break;
         case MSG_ERROR:
             sprintf(mmsg, _TCRED _BOLD "EE" _RESET _TCRED " %s" _RESET, msg);
             break;
         case MSG_WARNG:
-            sprintf(mmsg, _TCYELLOW _BOLD "WW" _RESET _TCYELLOW " %s" _RESET, msg);
+            if(global.system.log_level >= 1)
+                sprintf(mmsg, _TCYELLOW _BOLD "WW" _RESET _TCYELLOW " %s" _RESET, msg);
             break;
         case MSG_INFOR:
-            sprintf(mmsg, _TCGREEN _BOLD "II" _RESET _TCGREEN " %s" _RESET, msg);
+            if(global.system.log_level >= 3)
+                sprintf(mmsg, _TCGREEN _BOLD "II" _RESET _TCGREEN " %s" _RESET, msg);
             break;
         case MSG_ATTEN:
-            sprintf(mmsg, _TCCYAN _BOLD "@@" _RESET _TCCYAN " %s" _RESET, msg);
+            if(global.system.log_level >= 3)
+                sprintf(mmsg, _TCCYAN _BOLD "@@" _RESET _TCCYAN " %s" _RESET, msg);
             break;
         case MSG_MESSG:
-            sprintf(mmsg, _BOLD "**" _RESET " %s", msg);
+            if(global.system.log_level >= 2)
+                sprintf(mmsg, _BOLD "**" _RESET " %s", msg);
             break;
-        default:
-            ;
     }
     
     if(strlen(mmsg) > 0) {
@@ -70,26 +68,10 @@ inline int _rand()
     return r;
 }
 
-inline char *rpckup(char *a, char *b) // random pickup
-{
-    switch(_rand()%2) {
-        case 0: return a; break;
-        case 1: return b; break;
-    }
-}
-
-/* load's config file */
-bool load_config(char *file)
-{
-    /* CONFIG file format:
-     * valuename = value
-     * 
-     * currently only bot admins is configurable
-     */
-    
-    
-    
-    return true;
+void log_unknown(char *msg) {
+    FILE *f = fopen(global.config.unknownfile, "a+");
+    fprintf(f, "\n>>\"%s\"<<", msg);
+    fclose(f);
 }
 
 void read_line(FILE *fp, char *buf, int bufsize) {
@@ -125,8 +107,7 @@ char *strcstr(char *string, char *needle) {
     
     tolowers(buf1); tolowers(buf2);
     ret = strstr(buf1, buf2);
-    if(ret != NULL)
-        ret = string + (strlen(string) - strlen(ret));
+    if(ret != NULL) ret = string + (strlen(string) - strlen(ret));
     free(buf1); free(buf2);
     
     return ret;

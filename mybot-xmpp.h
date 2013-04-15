@@ -75,6 +75,7 @@ extern "C" {
             bool securitypass; // answer to security
             bool attackflooders; // attack flooders
             bool welcome; // say welcome to new comers
+            bool force; // force alive
             bool acceptfriendship; // accept friendship or not
         } config;
 
@@ -87,7 +88,7 @@ extern "C" {
         } status;
 
         struct {
-            bool debug;
+            uint log_level; // log level
             char *botadmins; // separated with ';' character
             char *config_file; // configuration file address
         } system;
@@ -95,7 +96,8 @@ extern "C" {
     
     void _message(MSGTYPE msgtype, char *msg, ...);
     inline char *pure_jid(char *jid);
-    bool load_config(char *file);
+    void log_unknown(char *msg);
+    inline int _rand();
     void read_line(FILE *fp, char *buf, int bufsize);
     inline void tolowers(char *string);
     char *strcstr(char *string, char *needle);
