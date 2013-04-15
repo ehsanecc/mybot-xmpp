@@ -219,11 +219,12 @@ void _get_substring(char *string, uint index, char *out) {
 /***************************************************
  * this is not only pcre's substring replace,
  * but some additional flags will take effect here:
- * $id 	 id of bot (can be used in question string)
- * $room room name (can be used in question string)
- * $time get's current time
- * $day  get current's day
- * $0-9  regex substrings
+ * $id 	   id of bot (can be used in question string)
+ * $room   room name (can be used in question string)
+ * $time   get's current time
+ * $day    get current's day
+ * $bash{} execute bash and get result
+ * $0-9    regex substrings
  ***************************************************
  */
 
@@ -273,6 +274,17 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
                 
                 sprintf(buf, "%.*s%.*s%s", i - 1, str, (int)strlen(buf2), buf2, str + i + 3);
                 strcpy(str, buf);
+            } else if(!strncmp(str+i, "bash{", 5)) {
+                // 
+                char buf2[256]; n=i+5;
+                while(str[n] != '}') buf2[n-(i+5)] = str[n++];
+                buf2[n-(i+5)] = '\0';
+                FILE *pipe = popen(buf2, "r");
+                buf2[fread(buf2, 1, 256, pipe)] = '\0';
+                fclose(pipe);
+                
+                sprintf(buf, "%.*s%.*s%s", i - 1, str, (int)strlen(buf2), buf2, str + n + 1);
+                strcpy(str, buf);
             }
         }
         i += 1;
@@ -294,19 +306,25 @@ int responser_clean_message(char *msg, char *from, char *cmsg) {
         i++;
     } if(n>0) strshift(cmsg,-(m), MAX_BUFSIZE);
     
+    if (strcstr(cmsg, from) != NULL)
+        strshift(strcstr(cmsg, from), -(fl+1), MAX_BUFSIZE); // shift to left
+    
     ml = strlen(cmsg) - 1; n=0; i=0;
     
     while(cmsg[ml] == ' ') // strip string(right)
         cmsg[ml--] = 0;
 
-    
     while (cmsg[0] == ' ') // strip string(left)
         strshift(cmsg, -1, MAX_BUFSIZE);
+    
+    while(cmsg[i]) { // remove duplicate spaces
+        if(cmsg[i] == ' ' && cmsg[i+1] == ' ')
+            strshift(cmsg+i, -1, MAX_BUFSIZE);
+        i++;
+    }
 
     if (strcstr(cmsg, from) == NULL)
         return 0;
-
-    strshift(strcstr(cmsg, from), -(fl+1) , MAX_BUFSIZE); // shift to left
 
     if (!responser_clean_message(cmsg, from, cmsg)) return 0;
 }
