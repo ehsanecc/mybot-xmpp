@@ -1,6 +1,6 @@
-mybot-xmpp
+<span style="color:green;">mybot-xmpp</span>
 ==========
 
-{test1}:{test2}
+This project's goal is to provide a <i>simple</i> but <i>powerful</i> robot for XMPP protocol.
 
-This project goal is to provide a simple but powerful robot for XMPP protocol.
+-in order to compile this project, you need to install libstrophe.
