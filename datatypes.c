@@ -16,7 +16,7 @@ LIST_t *mlist_init(int count, char *name, DATATYPE dtType) {
     switch (dtType) {
         case TINT: // integer type
             t->pItem = malloc(sizeof (int) * (count + 1));
-            for (n = 0; n < count; n++) t->pItem[n] = -1;
+            for (n = 0; n < count; n++) t->pItem[n] = (void*)-1;
             break;
         case TBOOL: // boolean type
             t->pItem = malloc(sizeof (bool) * (count + 1));
@@ -67,7 +67,7 @@ int mlist_find(LIST_t *t, char *str) {
     }
     
     for (n = 0; n < t->iMax; n++) {
-        if (t->pKey[n] != NULL && strcasestr(t->pKey[n], str) != NULL)
+        if (t->pKey[n] != NULL && strcasestr(t->pKey[n], str) != -1)
             return n;
     }
     
@@ -168,7 +168,7 @@ int mlist_expand(LIST_t *t, int iBlocks) {
         for(n=0;n<( t->iMax + iBlocks );n++) tKey[n] = NULL;
         memcpy(tKey, t->pKey, sizeof(void**) * t->iMax);
         free(t->pKey); // free previous memory
-        t->pKey = tKey; // new address
+        t->pKey = (char**)tKey; // new address
         
         t->iMax += iBlocks;
         
@@ -224,7 +224,7 @@ void list_print(LIST_t *t) {
     for (n = 0; n < t->iMax; n++) {
         if (t->pKey[n] != NULL) {
             switch (t->dtType) {
-                case TSTRING: printf("%d\t%s\t%s\n", n, t->pKey[n], t->pItem[n]);
+                case TSTRING: printf("%d\t%s\t%s\n", n, t->pKey[n], (char*)t->pItem[n]);
                     break;
                 case TUSER:
                     u = t->pItem[n];

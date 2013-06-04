@@ -1,11 +1,13 @@
 #!/bin/bash
 
-REQUIREMENTS="libexpat libm libpthread libresolv"
+REQUIREMENTS="libexpat;libxml libm libpthread libresolv libstrophe"
+
 echo "checking for requirements..."
 for rq in $REQUIREMENTS; do
-	if [ "$(locate $rq)" == "" ]; then
+	if [ "$(locate $(echo $rq | sed s/\;/\ /g))" == "" ]; then
 		echo "$rq required but not located."
 		error=1
+		nstrophe=1
 	fi
 done
 
@@ -16,7 +18,7 @@ fi
 
 function compile {
 	echo "compiling..."
-	if [ $(gcc mybot-xmpp.c mybot-functions.c datatypes.c ./modules/responser.c mybot-xmpp.h strophe.h datatypes.h ./modules/responser.h  libstrophe.a -lexpat -lssl -lpcre -lpthread -lresolv -o ./build/mybot-xmpp) ]; then
+	if [ $(gcc mybot-xmpp.c mybot-functions.c datatypes.c ./modules/responser.c mybot-xmpp.h strophe.h datatypes.h ./modules/responser.h  -lstrophe -lexpat -lssl -lpcre -lpthread -lresolv -o ./build/mybot-xmpp) ]; then
 		echo "done"
 	else
 		echo "please contact the author for any problem"

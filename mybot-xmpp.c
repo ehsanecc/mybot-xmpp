@@ -19,7 +19,9 @@ typedef struct {
 
 LIST_t *lFlood, *lUsers;
 
+// local functions
 void *loop_thread(void *ptr);
+void connect_to_room(xmpp_conn_t * const conn, xmpp_ctx_t *ctx);
 
 void mybot_init(xmpp_conn_t *conn, xmpp_ctx_t *ctx) {
     _message(MSG_DEBUG, "main.mybot_init(...);");
@@ -261,7 +263,7 @@ void *loop_thread(void *ptr) {
                         if (pl == lFlood->iCount) {
                             if (IMMODERATOR) { // if we can, so we BAN them
                                 _message(MSG_INFOR, "THREAD: trying to BAN flooders....(%d in list)", lFlood->iCount);
-                                msg_t p; p.to = lFlood; p.msg = NULL; p.conn = a->conn; p.ctx = a->ctx;
+                                msg_t p; p.to = (char*)lFlood; p.msg = NULL; p.conn = a->conn; p.ctx = a->ctx;
                                 list_print(lFlood);
                                 xmpp_room_command(p, "list:affiliation:outcast");
                                 mlist_free(lFlood);
@@ -273,7 +275,7 @@ void *loop_thread(void *ptr) {
 
                                 for (n = 0; n < lFlood->iMax; n++) { // build the report first!
                                     if (mlist_get(lFlood, NULL, n) != NULL)
-                                        sprintf(report, "%s\n%s@nimbuzz.com", report, mlist_get(lFlood, NULL, n));
+                                        sprintf(report, "%s\n%s@nimbuzz.com", report, (char*)mlist_get(lFlood, NULL, n));
                                 }
 
                                 for (n = 0; n < lUsers->iMax; n++) {
@@ -354,16 +356,24 @@ int version_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, void
 int presence_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, void * const userdata) {
     _message(MSG_DEBUG, "main.presence_handler(...);");
     
-    if (global.config.room != NULL && strstr(xmpp_stanza_get_attribute(stanza, "from"), global.config.room) != NULL) // in room
+    if (global.config.room != NULL &&
+            strstr(xmpp_stanza_get_attribute(stanza, "from"), global.config.room) != NULL)
+        // in room::
     {
-        if (xmpp_stanza_get_type(stanza) != NULL && !strcmp(xmpp_stanza_get_type(stanza), "unavailable") && !strncmp(xmpp_stanza_get_attribute(stanza, "from"), global.config.pjid, strlen(global.config.pjid)) != NULL) // we lost our connection to room
+        if (xmpp_stanza_get_type(stanza) != NULL &&
+                !strcmp(xmpp_stanza_get_type(stanza), "unavailable") &&
+                !strncmp(xmpp_stanza_get_attribute(stanza, "from"), global.config.pjid, strlen(global.config.pjid)))
+            // we lost our connection to room
         {
             /* probably kicked or banned */
             global.status.room_joined = false;
             global.status.wait = false;
             _message(MSG_WARNG, "connection lost.");
             
-        } else if (xmpp_stanza_get_attribute(stanza, "from") != NULL && strcmp((char*) (xmpp_stanza_get_attribute(stanza, "from") + strlen(global.config.room) + 1), "admin")) { // not admin
+        } else if (xmpp_stanza_get_attribute(stanza, "from") != NULL &&
+                strcmp((char*) (xmpp_stanza_get_attribute(stanza, "from") + strlen(global.config.room) + 1), "admin"))
+            // not admin
+        {
             // will say welcome to new joined room mates!
             char *from = strchr(xmpp_stanza_get_attribute(stanza, "from"), '/') + 1;
             xmpp_stanza_t *item = (xmpp_stanza_get_child_by_name(stanza, "x") != NULL ? xmpp_stanza_get_child_by_name(xmpp_stanza_get_child_by_name(stanza, "x"), "item") : NULL);
@@ -496,7 +506,7 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
             strcpy(replytext, guess);
         } else {
             _message(MSG_MESSG, "<(%s) :", guess);
-            scanf("%s", replytext);
+            last_return = scanf("%s", replytext);
         }
     } else {
         if (strcmp(id, global.config.pjid)) { // if not my message loopback to me, then

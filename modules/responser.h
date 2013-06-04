@@ -14,6 +14,7 @@ extern "C" {
     
 #include "../datatypes.h"
 #include <pcre.h>
+#include <stdio.h>
     
 #define OPTION_FLAG     '!'
 #define COMMENT_FLAG    '#'

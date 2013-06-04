@@ -58,7 +58,7 @@ inline int _rand()
     
 #ifdef __unix__
     FILE *fr = fopen("/dev/urandom", "rb");
-    fread(&r, sizeof(int), 1, fr);
+    last_return = fread(&r, sizeof(int), 1, fr);
     fclose(fr);
 #else
     srand(time(NULL));

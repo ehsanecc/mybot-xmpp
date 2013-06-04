@@ -218,7 +218,7 @@ void _get_substring(char *string, uint index, char *out) {
 }
 
 void _thread_bash(char *command) {
-    system(command);
+    last_return = system(command);
 }
 
 /***************************************************
@@ -290,7 +290,7 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
                 buf2[m] = '\0';
                 if(str[i+4] == '[') {
                     pthread_t t;
-                    pthread_create(&t, NULL, _thread_bash, buf2);
+                    pthread_create(&t, NULL, (void *)(void *)_thread_bash, buf2);
                 }
                 else {
                     FILE *pipe = popen(buf2, "r");

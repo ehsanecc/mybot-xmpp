@@ -92,7 +92,7 @@ extern "C" {
             char *botadmins; // separated with ';' character
             char *config_file; // configuration file address
         } system;
-    } global; // global struct used in program
+    } global; // global struct used in whole program
     
     void _message(MSGTYPE msgtype, char *msg, ...);
     inline char *pure_jid(char *jid);
@@ -103,6 +103,8 @@ extern "C" {
     char *strcstr(char *string, char *needle);
     bool isbotadmin(char *jid);
     void _init_screen(char *user, char *room);
+    
+    int last_return; // use this to silence the warning
 
 #ifdef	__cplusplus
 }
