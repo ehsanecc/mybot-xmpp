@@ -36,7 +36,7 @@ void mybot_init(xmpp_conn_t *conn, xmpp_ctx_t *ctx) {
 	a->conn = conn; a->ctx = ctx; a->msg = " "; a->to = global.config.room;
 	pthread_create(&tt, NULL, loop_thread, (void*)a);
     }
-    if(global.config.responsefile) {
+    if(global.config.responsefile != NULL) {
         int r = responser_init(global.config.responsefile);
         _message(MSG_INFOR, "%d responses loaded successfully.", r);
     }
@@ -525,7 +525,7 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
                 mlist_removek(lUsers, id); // remove it from users list
                 _message(MSG_INFOR, "currently %d flooders in our list.", lFlood->iCount);
 
-            } else if (!repeat) { // not repeated message
+            } else if (!repeat && global.config.responsefile != NULL) { // not repeated message, proccessing text
                 char msg[MAX_BUFSIZE] = "";
                 responser_clean_message(intext, global.config.pjid, msg);
                 if (user != NULL && (strcstr(intext, global.config.pjid) != NULL || lUsers->iCount == 1)) { // talking to us
@@ -678,6 +678,11 @@ int main(int argc, char **argv)
     global.config.responsefile = NULL;
     global.config.unknownfile = NULL;
     global.config.acceptfriendship = false;
+    
+    if(jid==NULL || strchr(jid, '@') == NULL) {
+        _message(MSG_ERROR, "pass JID as follows:\n\t\t pid@example.com");
+        return -1;
+    }
     
     {
         /* read command line */

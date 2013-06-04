@@ -12,6 +12,7 @@ int responser_init(char *responsefile/*[IN]*/) {
     /* response file format:
      * !private          << make all qr's after it for private response
      * !public           << make all qr's after it for public response
+     * !welcome          << make qr's after welcome strings
      * 1 "%s":"%s"       < (exact/partial/intext match)question:response
      * 2 "%s":{"%s"|"%s"}< {multiinput}:response
      * 3 ...
@@ -65,8 +66,8 @@ int responser_get(char *msg/*in*/, uint options/*in*/, char *userid/*in*/, char 
     int i, r=0, ovector[30]={0};
     
     buf = strmalloc(msg); tolowers(buf); // case-insensitive
-    if(userid != NULL) strcpy(__addressed_user, userid);
-    else strcpy(__addressed_user, "");
+    if(userid != NULL && __addressed_user != NULL) strcpy(__addressed_user, userid);
+    else if(__addressed_user != NULL) strcpy(__addressed_user, "");
     
     for (i = 0; i < __response_count; i++) {
         if ((__qr[i].q != NULL) && (__qr[i].options & options)) {
@@ -216,6 +217,10 @@ void _get_substring(char *string, uint index, char *out) {
     }
 }
 
+void _thread_bash(char *command) {
+    system(command);
+}
+
 /***************************************************
  * this is not only pcre's substring replace,
  * but some additional flags will take effect here:
@@ -224,10 +229,10 @@ void _get_substring(char *string, uint index, char *out) {
  * $time   get's current time
  * $day    get current's day
  * $bash{} execute bash and get result
+ * $bash[] execute bash ( silence )
  * $0-9    regex substrings
  ***************************************************
  */
-
 void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
     _message(MSG_DEBUG | MSG_SUB, "responser._pcre_replace(\"%s\", \"%s\", int*, %u)", str, msg, vectors);
     uint i=0, n;
@@ -235,7 +240,7 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
 
     while (str[i]) {
         if (str[i] == '$') {
-            i++;
+            i += 1;
             if (isdigit(str[i])) {
                 n = atoi(str + i);
                 if (n <= vectors) {
@@ -261,8 +266,7 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
                 char buf2[16];
                 time_t rawtime;
                 time(&rawtime);
-                strftime(buf2, 16, "%H:%M:%S", localtime(&rawtime));
-                
+                strftime(buf2, 16, "%H:%M", localtime(&rawtime));
                 sprintf(buf, "%.*s%.*s%s", i - 1, str, (int)strlen(buf2), buf2, str + i + 4);
                 strcpy(str, buf);
             } else if(!strncmp(str+i, "day", 3)) {
@@ -271,20 +275,35 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
                 time_t rawtime;
                 time(&rawtime);
                 strftime(buf2, 16, "%A", localtime(&rawtime));
-                
                 sprintf(buf, "%.*s%.*s%s", i - 1, str, (int)strlen(buf2), buf2, str + i + 3);
                 strcpy(str, buf);
-            } else if(!strncmp(str+i, "bash{", 5)) {
+            } else if (!strncmp(str + i, "bash", 4)) {
                 // 
-                char buf2[256]; n=i+5;
-                while(str[n] != '}') buf2[n-(i+5)] = str[n++];
-                buf2[n-(i+5)] = '\0';
-                FILE *pipe = popen(buf2, "r");
-                buf2[fread(buf2, 1, 256, pipe)] = '\0';
-                fclose(pipe);
-                
-                sprintf(buf, "%.*s%.*s%s", i - 1, str, (int)strlen(buf2), buf2, str + n + 1);
+                int m = 0;
+                char buf2[strlen(str) - i];
+                _pcre_replace(str + i + 5, msg, ovector, vectors);
+                n = i + 5;
+                while (str[n] != '}' && str[n] != ']') {
+                    if (str[n] == '\\') n++;
+                    buf2[m++] = str[n++];
+                }
+                buf2[m] = '\0';
+                if(str[i+4] == '[') {
+                    pthread_t t;
+                    pthread_create(&t, NULL, _thread_bash, buf2);
+                }
+                else {
+                    FILE *pipe = popen(buf2, "r");
+                    buf2[fread(buf2, 1, 512, pipe)] = '\0';
+                    fclose(pipe);
+                }
+                if (str[i + 4] == '{')
+                    sprintf(buf, "%.*s%.*s%s", i - 1, str, (int) strlen(buf2), buf2, str + n + 1);
+                else
+                    sprintf(buf, "%.*s%s", i - 1, str, str + n + 1);
                 strcpy(str, buf);
+            } else if (str[i] == '{') { // script
+
             }
         }
         i += 1;
