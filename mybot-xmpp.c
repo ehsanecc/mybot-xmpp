@@ -390,7 +390,6 @@ int presence_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, voi
                     if (global.config.welcome) {
                         // welcome
                         responser_get(NULL, FLG_WELCOME, id, msg);
-                        //sprintf(msg, rpckup("salam %s", rpckup(rpckup("khosh umadi %s", rpckup(rpckup("welcome %s", rpckup("kheili khosh umadi %s", "Wb %s")), "slm %s")), "dorood bar to %s")), id);
                         send_message(xmpp_stanza_get_attribute(stanza, "from"), msg, "groupchat", conn, (xmpp_ctx_t*) userdata);
                     }
                 } else { // presence of us

@@ -25,6 +25,7 @@ extern "C" {
 #define FLG_PRIVATE     0x00000002 // private addressed, just to me(bot)
 #define FLG_CASESENSE   0x00000004 // case sensitive
 #define FLG_CASEINSEN   0x00000008 // case in-sensitive
+#define FLG_ADMIN       0x00000010
 #define FLG_WELCOME     0x10000000 // welcome strings
 #define FLG_DEFAULT     (FLG_PRIVATE | FLG_CASEINSEN)
     

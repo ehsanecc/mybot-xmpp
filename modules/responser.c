@@ -64,6 +64,7 @@ int responser_get(char *msg/*in*/, uint options/*in*/, char *userid/*in*/, char 
     _message(MSG_DEBUG | MSG_SUB, "responser.get(\"%s\", %d, \"%s\")", msg, options, userid);
     char *buf;
     int i, r=0, ovector[30]={0};
+    bool isadmin = isbotadmin(userid);
     
     buf = strmalloc(msg); tolowers(buf); // case-insensitive
     if(userid != NULL && __addressed_user != NULL) strcpy(__addressed_user, userid);
@@ -78,6 +79,10 @@ int responser_get(char *msg/*in*/, uint options/*in*/, char *userid/*in*/, char 
 
             if (r >= 0) { // match
                 _message(MSG_DEBUG, "responser: question %d matched.", i);
+                if((__qr[i].options & FLG_ADMIN) && !isadmin) {// it's for bot admin's only
+                    _message(MSG_WARNG, "responser: non admin user(%s) request admin command(%s).", userid, msg);
+                    break;
+                }
                 if(__qr[i].response_count > 1) _get_substring(__qr[i].r, ((unsigned)_rand())%__qr[i].response_count, response);
                 else strcpy(response, __qr[i].r);
                 _pcre_replace(response, msg, ovector, r);
@@ -108,8 +113,9 @@ int _read_qr(FILE *file, QR_t *qr) {
         case OPTION_FLAG:
             read_line(file, q, MAX_BUFSIZE); line++;
             
-            if (!strcasecmp(q, "public")) { options |= FLG_PUBLIC; options &= ~FLG_PRIVATE; }
-            else if (!strcasecmp(q, "private")) { options |= FLG_PRIVATE; options &= ~FLG_PUBLIC; }
+            if (!strcasecmp(q, "public")) { options |= FLG_PUBLIC; options &= ~(FLG_PRIVATE|FLG_ADMIN); }
+            else if (!strcasecmp(q, "private")) { options |= FLG_PRIVATE; options &= ~(FLG_PUBLIC|FLG_ADMIN); }
+            else if (!strcasecmp(q, "admin")) { options |= FLG_ADMIN | FLG_PRIVATE; }
             else if (!strcasecmp(q, "case-insensitive")) { options |= FLG_CASEINSEN; options &= ~FLG_CASESENSE; }
             else if (!strcasecmp(q, "case-sensitive")) { options |= FLG_CASESENSE; options &= ~FLG_CASEINSEN; }
             else if (!strcasecmp(q, "welcome")) options = FLG_WELCOME;
