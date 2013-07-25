@@ -95,13 +95,13 @@ extern "C" {
     } global; // global struct used in whole program
     
     void _message(MSGTYPE msgtype, char *msg, ...);
-    inline char *pure_jid(char *jid);
+    char *pure_jid(char *jid);
     void log_unknown(char *msg);
     inline int _rand();
     void read_line(FILE *fp, char *buf, int bufsize);
     inline void tolowers(char *string);
     char *strcstr(char *string, char *needle);
-    bool isbotadmin(char *jid);
+    bool isbotadmin(char *pjid);
     void _init_screen(char *user, char *room);
     
     int last_return; // use this to silence the warning

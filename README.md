@@ -21,13 +21,13 @@ and much smarter.
 
 responser requires a file with the following format, '#' flag uses for comments, so you can put this as a header of your response file.
 here is an example of a simple response file, when someone joins the room it uses 
-"hi" or "hello" or "welcome" randomaticaly. ( the use of '|' character to say or )
-and when someone sayed "hi" or "hello"(perl regex) robot will answer "hello".
+"hi" or "hello" or "welcome" randomaticaly. ( the use of '|' character to say "or" )
+and when someone said "hi" or "hello"(perl regex) robot will answer "hello".
 ```
 ##############################################
 # input format :
 # q question regex; r response
-# "q":{"r","r",...}
+# "q":{"r"|"r"|...}
 # pre-compiled strings:
 #     $id 	  id of bot (can be used in question string)
 #	  $uid	  id of addressed person(who bot talking to) or user id

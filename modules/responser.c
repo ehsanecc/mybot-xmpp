@@ -64,7 +64,11 @@ int responser_get(char *msg/*in*/, uint options/*in*/, char *userid/*in*/, char 
     _message(MSG_DEBUG | MSG_SUB, "responser.get(\"%s\", %d, \"%s\")", msg, options, userid);
     char *buf;
     int i, r=0, ovector[30]={0};
-    bool isadmin = isbotadmin(userid);
+    bool isadmin;
+    
+    buf = pure_jid(userid);
+    isadmin = isbotadmin(buf);
+    free(buf);
     
     buf = strmalloc(msg); tolowers(buf); // case-insensitive
     if(userid != NULL && __addressed_user != NULL) strcpy(__addressed_user, userid);
@@ -286,7 +290,7 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
             } else if (!strncmp(str + i, "bash", 4)) {
                 // 
                 int m = 0;
-                char buf2[strlen(str) - i];
+                char buf2[MAX_BUFSIZE];
                 _pcre_replace(str + i + 5, msg, ovector, vectors);
                 n = i + 5;
                 while (str[n] != '}' && str[n] != ']') {
@@ -300,8 +304,10 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
                 }
                 else {
                     FILE *pipe = popen(buf2, "r");
-                    buf2[fread(buf2, 1, 512, pipe)] = '\0';
-                    fclose(pipe);
+                    m = fread(buf2, 1, MAX_BUFSIZE, pipe);
+                    if(m==-1) buf2[0] = 0;
+                    else buf2[m]=0;
+                    pclose(pipe);
                 }
                 if (str[i + 4] == '{')
                     sprintf(buf, "%.*s%.*s%s", i - 1, str, (int) strlen(buf2), buf2, str + n + 1);

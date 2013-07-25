@@ -486,6 +486,11 @@ int groupchat_message_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const st
     
     id = (char*) (xmpp_stanza_get_attribute(stanza, "from") + strlen(global.config.room) + 1);
     
+    if(id == NULL || (id != NULL && !strcmp(id, ""))) {
+        _message(MSG_DEBUG, "groupchat_message_handler: id is null, skip");
+        return 1;
+    }    
+    
     if (mlist_get(lFlood, id, 0) != NULL) // it's flooder!
         return 1;
     

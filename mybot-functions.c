@@ -114,13 +114,22 @@ char *strcstr(char *string, char *needle) {
 }
 
 /* getting pure JID */
-inline char *pure_jid(char *jid) {
+char *pure_jid(char *jid) {
+    // group chat jid: groupname@conference.example.com/pjid
+    // chat jid: pjid@example.com
     _message(MSG_DEBUG, "pure_jid(\"%s\")", jid);
+    if(jid == NULL || (jid != NULL && !strcmp(jid, ""))) return NULL;
     char buf[MAX_JID];
     
     strcpy(buf, jid);
+    if(strchr(jid, '@') == NULL) // means it's currenty pjid!
+        return strmalloc(jid);
     buf[strlen(jid) - strlen(strchr(jid, '@'))] = 0;
     
+    if(!strcmp(buf, global.config.room)) // group chat
+        strcpy(buf, strchr(jid, '/')+1);
+    
+    _message(MSG_DEBUG, "pure_jid.return %s", buf);
     return strmalloc(buf);
 }
 
@@ -130,6 +139,7 @@ bool isbotadmin(char *jid)
     // the format of global.system.botadmins is: <pjid>;<pjid>;<pjid>;...
     char pjid[MAX_JID];
     uint p=0, q=0;
+    bool ret = false;
     
     if(jid == NULL || global.system.botadmins == NULL) return false;
     
@@ -137,11 +147,14 @@ bool isbotadmin(char *jid)
         while((global.system.botadmins[p] != ';') && (global.system.botadmins[p]))
             pjid[q++] = global.system.botadmins[p++];
         pjid[q] = 0; q=0;
-        if(!strcmp(jid, pjid)) return true;
+        if(!strcmp(jid, pjid)) {
+            ret = true;
+            break;
+        }
         else p++;
     }
     
-    return false;
+    return ret;
 }
 
 /* ****************************************
