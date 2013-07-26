@@ -196,7 +196,7 @@ typedef enum {
 } xmpp_error_type_t;
 
 typedef struct {
-    xmpp_error_type_t match_type;
+    xmpp_error_type_t type;
     char *text;
     xmpp_stanza_t *stanza;
 } xmpp_stream_error_t;

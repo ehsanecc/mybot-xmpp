@@ -171,7 +171,7 @@ int _read_qr(FILE *file, QR_t *qr) {
 
         qr->q = pcre_compile(q, 0, &error, &of, tptr);
         if (qr->q == NULL) {
-            _message(MSG_ERROR, "responser._pcre error: %s", error);
+            _message(MSG_ERROR, "responser._pcre error(%d): %s", line, error);
             return 0;
         }
     }

@@ -1,10 +1,10 @@
-#include "strophe.h"
+#include "./libstrophe/strophe.h"
 #include "datatypes.h"
 #include "mybot-xmpp.h"
 #include "modules/responser.h"
 
 /*
- * This project finally started!
+ * 
  */
 
 typedef struct {
@@ -448,10 +448,15 @@ int presence_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, voi
             }
         }
     }
+    
     if(xmpp_stanza_get_type(stanza) != NULL && !strcmp(xmpp_stanza_get_type(stanza),"error")) {
         global.status.room_joined = false;
         global.status.wait = false;
-        _message(MSG_WARNG, "connection lost.");
+        _message(MSG_WARNG, "connection lost.(%s)", xmpp_stanza_get_attribute(xmpp_stanza_get_child_by_name(stanza, "error"), "code"));
+        if(!strcmp(xmpp_stanza_get_attribute(xmpp_stanza_get_child_by_name(stanza, "error"), "code"), "403")) { // means we are banned
+            global.status.banned = true;
+            glo
+        }
     }
     
     if(xmpp_stanza_get_type(stanza) != NULL && !strcmp(xmpp_stanza_get_type(stanza),"subscribe")) // friend request
