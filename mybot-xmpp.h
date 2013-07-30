@@ -20,6 +20,7 @@ extern "C" {
 #include <stdarg.h>
 #include <signal.h>
 #include <ctype.h>
+#include <curses.h>
     
     
     // ANSI output text format
@@ -102,6 +103,7 @@ extern "C" {
     inline void tolowers(char *string);
     char *strcstr(char *string, char *needle);
     bool isbotadmin(char *pjid);
+    int isflooder(char *msg, char *from, LIST_t *lUsers);
     void _init_screen(char *user, char *room);
     
     int last_return; // use this to silence the warning

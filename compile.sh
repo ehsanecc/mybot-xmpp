@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REQUIREMENTS="libexpat;libxml libm libpthread libresolv libstrophe"
+REQUIREMENTS="libexpat;libxml libm libpthread libresolv libstrophe libssl"
 
 echo "checking for requirements..."
 for rq in $REQUIREMENTS; do

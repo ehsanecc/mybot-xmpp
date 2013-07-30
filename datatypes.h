@@ -14,6 +14,7 @@ extern "C" {
 
 #include <time.h>
 #include <sys/types.h>
+#include <curses.h> // only for it's boolean type
     
     typedef enum {
         TSTRING,
@@ -87,11 +88,8 @@ extern "C" {
         int iAttention; 
     } _USER_t;       // used to store/restore
 
-    typedef unsigned char bool;
 #define MAX_BUFSIZE     8192    // 8KiB
 #define MAX_JID         1024    // 256 * 4 (for unicode)
-#define true               1
-#define false              0
 
 char *strmalloc(char *str); // allocate an string of str in ram
 void strshift(char *str, int shifttoright, uint maxlength); // shift string to right(left)

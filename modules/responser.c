@@ -2,9 +2,7 @@
 #include "responser.h"
 
 /* responser v2.0
- *
- * + Using the PCRE( Perl Compatible Regular Expression ).
- * + 
+ * this source need to be really check, recode and review to get the best optimized as possible.
  */
 
 int responser_init(char *responsefile/*[IN]*/) {
@@ -326,77 +324,119 @@ void _pcre_replace(char *str, char *msg, int *ovector, uint vectors) {
  * clear message from "from" string
  */
 int responser_clean_message(char *msg, char *from, char *cmsg) {
-    _message(MSG_DEBUG | MSG_SUB, "responser.clean_message(\"%s\", \"%s\", \"%s\")", msg, from, cmsg);
-    int ml = strlen(msg), fl = strlen(from), n=0, m, i = 0;
-    
-    strcpy(cmsg, msg);
-    
-    // if multi-line, cut last line
-    while(msg[i]) {
-        if(msg[i]=='\n') { n++; m=i; }
-        i++;
-    } if(n>0) strshift(cmsg,-(m), MAX_BUFSIZE);
-    
-    if (strcstr(cmsg, from) != NULL)
-        strshift(strcstr(cmsg, from), -(fl+1), MAX_BUFSIZE); // shift to left
-    
-    ml = strlen(cmsg) - 1; n=0; i=0;
-    
-    while(cmsg[ml] == ' ') // strip string(right)
-        cmsg[ml--] = 0;
+	_message(MSG_DEBUG | MSG_SUB,
+			"responser.clean_message(\"%s\", \"%s\", \"%s\")", msg, from, cmsg);
+	int ml = strlen(msg), fl = strlen(from), n = 0, m = 0, i = 0;
 
-    while (cmsg[0] == ' ') // strip string(left)
-        strshift(cmsg, -1, MAX_BUFSIZE);
-    
-    while(cmsg[i]) { // remove duplicate spaces
-        if(cmsg[i] == ' ' && cmsg[i+1] == ' ')
-            strshift(cmsg+i, -1, MAX_BUFSIZE);
-        i++;
-    }
+	strcpy(cmsg, msg);
 
-    if (strcstr(cmsg, from) == NULL)
-        return 0;
+	// if multi-line, cut last line
+	while (msg[i]) {
+		if (msg[i] == '\n') {
+			n++;
+			m = i;
+		}
+		i++;
+	}
+	if (n > 0)
+		strshift(cmsg, -(m), MAX_BUFSIZE);
 
-    if (!responser_clean_message(cmsg, from, cmsg)) return 0;
+	if (strcstr(cmsg, from) != NULL)
+		strshift(strcstr(cmsg, from), -(fl + 1), MAX_BUFSIZE); // shift to left
+
+	ml = strlen(cmsg) - 1;
+	n = 0;
+	i = 0;
+
+	while (cmsg[ml] == ' ') // strip string(right)
+		cmsg[ml--] = 0;
+
+	while (cmsg[0] == ' ') // strip string(left)
+		strshift(cmsg, -1, MAX_BUFSIZE);
+
+	while (cmsg[i]) { // remove duplicate spaces
+		if (cmsg[i] == ' ' && cmsg[i + 1] == ' ')
+			strshift(cmsg + i, -1, MAX_BUFSIZE);
+		i++;
+	}
+
+	if (strcstr(cmsg, from) == NULL
+			|| !responser_clean_message(cmsg, from, cmsg))
+		return 0;
+
+	return 0;
 }
 
 /* only used by get_security_answer function */
 int read_number(const char *b) {
-    if (b[0] <= '9' && b[0] >= '0') return atoi(b);
-    else if (!strncmp(b, "eleven", 6)) return 11;
-    else if (!strncmp(b, "twelve", 6)) return 12;
-    else if (!strncmp(b, "thirteen", 8)) return 13;
-    else if (!strncmp(b, "fourteen", 8)) return 14;
-    else if (!strncmp(b, "fifteen", 7)) return 15;
-    else if (!strncmp(b, "sixteen", 7)) return 16;
-    else if (!strncmp(b, "seventeen", 9)) return 17;
-    else if (!strncmp(b, "eighteen", 8)) return 18;
-    else if (!strncmp(b, "nineteen", 8)) return 19;
-    else if (!strncmp(b, "twenty", 6)) return 20;
-    else if (!strncmp(b, "thirty", 6)) return 30;
-    else if (!strncmp(b, "forty", 5)) return 40;
-    else if (!strncmp(b, "fifty", 5)) return 50;
-    else if (!strncmp(b, "sixty", 5)) return 60;
-    else if (!strncmp(b, "seventy", 7)) return 70;
-    else if (!strncmp(b, "eighty", 6)) return 80;
-    else if (!strncmp(b, "ninety", 6)) return 90;
-    else if (!strncmp(b, "zero", 3)) return 0;
-    else if (!strncmp(b, "one", 3)) return 1;
-    else if (!strncmp(b, "two", 3)) return 2;
-    else if (!strncmp(b, "three", 5)) return 3;
-    else if (!strncmp(b, "four", 4)) return 4;
-    else if (!strncmp(b, "five", 4)) return 5;
-    else if (!strncmp(b, "six", 3)) return 6;
-    else if (!strncmp(b, "seven", 5)) return 7;
-    else if (!strncmp(b, "eight", 5)) return 8;
-    else if (!strncmp(b, "nine", 4)) return 9;
-    else if (!strncmp(b, "ten", 3)) return 10;
-    else if (!strncmp(b, "hundred", 7)) return 100;
-    else if (!strncmp(b, "thousand", 8)) return 1000;
-    else return -1;
+	if (b[0] <= '9' && b[0] >= '0')
+		return atoi(b);
+	else if (!strncmp(b, "eleven", 6))
+		return 11;
+	else if (!strncmp(b, "twelve", 6))
+		return 12;
+	else if (!strncmp(b, "thirteen", 8))
+		return 13;
+	else if (!strncmp(b, "fourteen", 8))
+		return 14;
+	else if (!strncmp(b, "fifteen", 7))
+		return 15;
+	else if (!strncmp(b, "sixteen", 7))
+		return 16;
+	else if (!strncmp(b, "seventeen", 9))
+		return 17;
+	else if (!strncmp(b, "eighteen", 8))
+		return 18;
+	else if (!strncmp(b, "nineteen", 8))
+		return 19;
+	else if (!strncmp(b, "twenty", 6))
+		return 20;
+	else if (!strncmp(b, "thirty", 6))
+		return 30;
+	else if (!strncmp(b, "forty", 5))
+		return 40;
+	else if (!strncmp(b, "fifty", 5))
+		return 50;
+	else if (!strncmp(b, "sixty", 5))
+		return 60;
+	else if (!strncmp(b, "seventy", 7))
+		return 70;
+	else if (!strncmp(b, "eighty", 6))
+		return 80;
+	else if (!strncmp(b, "ninety", 6))
+		return 90;
+	else if (!strncmp(b, "zero", 3))
+		return 0;
+	else if (!strncmp(b, "one", 3))
+		return 1;
+	else if (!strncmp(b, "two", 3))
+		return 2;
+	else if (!strncmp(b, "three", 5))
+		return 3;
+	else if (!strncmp(b, "four", 4))
+		return 4;
+	else if (!strncmp(b, "five", 4))
+		return 5;
+	else if (!strncmp(b, "six", 3))
+		return 6;
+	else if (!strncmp(b, "seven", 5))
+		return 7;
+	else if (!strncmp(b, "eight", 5))
+		return 8;
+	else if (!strncmp(b, "nine", 4))
+		return 9;
+	else if (!strncmp(b, "ten", 3))
+		return 10;
+	else if (!strncmp(b, "hundred", 7))
+		return 100;
+	else if (!strncmp(b, "thousand", 8))
+		return 1000;
+	else
+		return -1;
 }
 
-/* try to answer security questions of specially nimbuzz, it's a guess
+/* info:
+ * try to answer security questions(nimbuzz!), it's a guess
  * based on specified format, if format changes, this will not useful(should change in time)
  */
 void get_security_answer(char *question, char *answer) {
@@ -443,7 +483,7 @@ void get_security_answer(char *question, char *answer) {
         sprintf(answer, "%d", result);
     }        // What is the 2nd digit of 99100?
     else if (strstr((char*) (question + a), "digit") != NULL) {
-        int x, y;
+        int x;
         x = read_number((char*) (question + a + 12));
         sprintf(answer, "%c", question[a + 24 + x]);
     }        //Of the numbers fourteen, 29 and 16, which is the smallest?

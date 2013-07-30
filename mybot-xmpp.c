@@ -1,10 +1,11 @@
-#include "./libstrophe/strophe.h"
+#include "strophe.h"
 #include "datatypes.h"
 #include "mybot-xmpp.h"
 #include "modules/responser.h"
 
-/*
- * 
+/* this project started in gedit, switched to netbeans as it grows and finally
+ * after several netbeans crashes(!!), i just change my IDE to eclipse.
+ * hope eclipse not crash! :)
  */
 
 typedef struct {
@@ -259,7 +260,7 @@ void *loop_thread(void *ptr) {
                 // on joined
                 for (delay = 0; delay < 40 && global.status.room_joined == true; delay++) {
                     sleep(6);
-                    if (global.config.attackflooders == true && (lFlood != NULL && (lFlood->iCount >= 4 || ((delay % 6) == 0) && lFlood->iCount > 0))) {
+                    if (global.config.attackflooders == true && (lFlood != NULL && (lFlood->iCount >= 4 || (((delay % 6) == 0) && lFlood->iCount > 0)))) {
                         if (pl == lFlood->iCount) {
                             if (IMMODERATOR) { // if we can, so we BAN them
                                 _message(MSG_INFOR, "THREAD: trying to BAN flooders....(%d in list)", lFlood->iCount);
@@ -455,7 +456,6 @@ int presence_handler(xmpp_conn_t * const conn, xmpp_stanza_t * const stanza, voi
         _message(MSG_WARNG, "connection lost.(%s)", xmpp_stanza_get_attribute(xmpp_stanza_get_child_by_name(stanza, "error"), "code"));
         if(!strcmp(xmpp_stanza_get_attribute(xmpp_stanza_get_child_by_name(stanza, "error"), "code"), "403")) { // means we are banned
             global.status.banned = true;
-            glo
         }
     }
     
@@ -649,40 +649,77 @@ void conn_handler(xmpp_conn_t * const conn, const xmpp_conn_event_t status, cons
 
 #ifdef __unix__
 void sigterm() { // termination process
-    _message(MSG_WARNG, "\nTermination process...");
-    // termination process {{
-    // }}
-    exit(0);
+	_message(MSG_WARNG, "Termination process...");
+	// termination process {{
+	// }}
+	exit(0);
 }
 #endif
 
-int main(int argc, char **argv)
-{
-    xmpp_ctx_t *ctx;
-    xmpp_conn_t *conn;
-    xmpp_log_t *log;
-    char *jid, *pass;
+void view_help() {
+	fprintf(stderr,
+			"Usage: mybot-xmpp <jid> <pass> [[--room | -r] <room-to-join>] [--accept | -a] [--response <responsefile:in>] [[--unknown | -u] <unknownquestionsfile:out>] [-d | --debug] [--security-answer | -s]\n\n"
+			"  --room -r\t\tRoom to join\n"
+			"  --level -l <int> \tLog level ( Error Warning Message Information Debug )\n"
+			"       0 - E\n"
+			"       1 - EW \n"
+			"       2 - EWM\n"
+			"       3 - EWMI\n"
+			"       4 - EWMID ( everything )\n"
+			"  --config -c\t\tConfiguration file to load\n"
+			"  --force -f\t\tForce robot to being alive\n"
+			"  --admins \t\tBot admins pjid's, separated with ';' character\n"
+			"  --accept -a\t\tAccept friendship request\n"
+			"  --response\t\tRead responses from file\n"
+			"  --unknown \t\tWrite unknown(not in response list) questions in file\n"
+			"  --security-answer\tAnswer automatically to security questions\n");
+}
+
+void read_args(int argn, char **argv) {
+	/* read arguments */
+	int v;
+	for (v = 3; v < argn; v++) {
+		if (!strcmp(argv[v], "-r") || !strcmp(argv[v], "--room"))
+			global.config.room = argv[++v]; // room to join
+		else if (!strcmp(argv[v], "--admins"))
+			global.system.botadmins = argv[++v]; // bot administrators
+		else if (!strcmp(argv[v], "--response"))
+			global.config.responsefile = argv[++v]; // response file
+		else if (!strcmp(argv[v], "-a") || !strcmp(argv[v], "--accept"))
+			global.config.acceptfriendship = true; // accept friend request
+		else if (!strcmp(argv[v], "-c") || !strcmp(argv[v], "--config"))
+			global.system.config_file = argv[++v]; // configuration
+		else if (!strcmp(argv[v], "-u") || !strcmp(argv[v], "--unknown"))
+			global.config.unknownfile = argv[++v]; // unknown questions file
+		else if (!strcmp(argv[v], "-l") || !strcmp(argv[v], "--level"))
+			global.system.log_level = (uint) atoi(argv[++v]); // log level
+		else if (!strcmp(argv[v], "-s")
+				|| !strcmp(argv[v], "--security-answer"))
+			global.config.securitypass = true;
+		else if (!strcmp(argv[v], "-f") || !strcmp(argv[v], "--force"))
+			global.config.force = true;
+		else {
+			fprintf(stderr,
+					"unknown option '%s'.\n run without argument to get help\n\n",
+					argv[v]);
+			exit(1);
+		}
+	}
+
+	global.config.pjid = pure_jid(argv[1]);
+}
+
+int main(int argc, char **argv) {
+	xmpp_ctx_t *ctx;
+	xmpp_conn_t *conn;
+	xmpp_log_t *log;
+	char *jid, *pass;
 
     /* take a JID and password on the command line */
-    if (argc < 3) {
-        fprintf(stderr, 
-                "Usage: mybot-xmpp <jid> <pass> [[--room | -r] <room-to-join>] [--accept | -a] [--response <responsefile:in>] [[--unknown | -u] <unknownquestionsfile:out>] [-d | --debug] [--security-answer | -s]\n\n"\
-                "  --room -r\t\tRoom to join\n"\
-                "  --level -l <int> \tLog level ( Error Warning Message Information Debug )\n"\
-                "       0 - E\n"\
-                "       1 - EW \n"\
-                "       2 - EWM\n"\
-                "       3 - EWMI\n"\
-                "       4 - EWMID ( everything )\n"\
-                "  --config -c\t\tConfiguration file to load\n"\
-                "  --force -f\t\tForce robot to being alive\n"\
-                "  --admins \t\tBot admins pjid's, separated with ';' character\n"\
-                "  --accept -a\t\tAccept friendship request\n"\
-                "  --response\t\tRead responses from file\n"\
-                "  --unknown \t\tWrite unknown(not in response list) questions in file\n"\
-                "  --security-answer\tAnswer automatically to security questions\n");
-	return 1;
-    }
+	if (argc < 3) {
+		view_help();
+		return 1;
+	}
     
 #ifdef __unix__
     signal(SIGINT, sigterm); // register signal for answer on exit(ctrl+c)
@@ -703,27 +740,7 @@ int main(int argc, char **argv)
         return -1;
     }
     
-    {
-        /* read command line */
-        int v;
-        for(v=3;v<argc;v++) {
-            if(!strcmp(argv[v], "-r") || !strcmp(argv[v], "--room")) global.config.room = argv[++v]; // room to join
-            else if(!strcmp(argv[v], "--admins")) global.system.botadmins = argv[++v]; // bot administrators
-            else if(!strcmp(argv[v], "--response")) global.config.responsefile = argv[++v]; // response file
-            else if(!strcmp(argv[v], "-a") || !strcmp(argv[v], "--accept")) global.config.acceptfriendship = true; // accept friendrequest
-            else if(!strcmp(argv[v], "-c") || !strcmp(argv[v], "--config")) global.system.config_file = argv[++v]; // configuration
-            else if(!strcmp(argv[v], "-u") || !strcmp(argv[v], "--unknown")) global.config.unknownfile = argv[++v]; // unknown questions file
-            else if(!strcmp(argv[v], "-l") || !strcmp(argv[v], "--level")) global.system.log_level = (uint) atoi(argv[++v]); // log level
-            else if(!strcmp(argv[v], "-s") || !strcmp(argv[v], "--security-answer")) global.config.securitypass = true;
-            else if(!strcmp(argv[v], "-f") || !strcmp(argv[v], "--force")) global.config.force = true;
-            else {
-                fprintf(stderr, "unknown option '%s'.\nrun without argument to get help\n\n", argv[v]);
-                exit(1);
-            }
-        }
-        
-        global.config.pjid = pure_jid(jid);
-    }
+    read_args(argc, argv);
     
     /* load configuration file if any */
 
